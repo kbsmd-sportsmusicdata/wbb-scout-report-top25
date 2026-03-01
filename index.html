@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Softball Early-Season Volatility Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Oswald:wght@400;500;600;700&family=Permanent+Marker&display=swap');
+
+:root {
+  --sw: 224px;
+  --bg-sb:    #05090f;
+  --bg-main:  #070c14;
+  --bg-card:  #0c1520;
+  --bg-card2: #101d2c;
+  --border:   #182637;
+  --border2:  #1e3348;
+  /* Analytics Edge categorical */
+  --cat1:#5D5C9C; --cat2:#7E7EB8; --cat3:#5B9AA9; --cat4:#D4A574; --cat5:#E88D67;
+  /* Impact Metrics diverging: orange=regression, blue=contender, teal=riser */
+  --over:#F2994A; --stable:#2E5090; --under:#5B9AA9;
+  /* Stat Leader sequential */
+  --seq1:#0D3B66; --seq2:#1B5A8F; --seq3:#3682BA; --seq4:#5AA9D6; --seq5:#87CEEB;
+  /* Accent */
+  --acc: #D4A574; --acc2:#a87840;
+  /* Text */
+  --t1:#e8edf5; --t2:#8fa3be; --t3:#4a6180; --t4:#2d4a62;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family:'Montserrat',sans-serif;
+  background:var(--bg-main);
+  color:var(--t1);
+  display:flex;
+  min-height:100vh;
+  font-size:13px;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width:var(--sw);
+  min-width:var(--sw);
+  background:var(--bg-sb);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  position:fixed;
+  top:0; left:0; bottom:0;
+  overflow-y:auto;
+  z-index:200;
+}
+
+.sb-brand {
+  padding:20px 16px 16px;
+  border-bottom:1px solid var(--border);
+}
+.sb-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  background:rgba(212,165,116,.12); border:1px solid rgba(212,165,116,.28);
+  color:var(--acc); font-size:10px; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; padding:3px 10px; border-radius:20px; margin-bottom:10px;
+}
+.sb-title {
+  font-size:13px; font-weight:800; color:var(--t1); letter-spacing:-.01em;
+  line-height:1.35;
+}
+.sb-sub { font-size:10.5px; color:var(--t3); margin-top:3px; line-height:1.4; }
+
+.sb-section-label {
+  font-size:9.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--t4); padding:14px 16px 6px;
+}
+
+/* ── NAV TABS ── */
+.nav-list { list-style:none; padding:0 8px; }
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding:9px 10px; border-radius:7px; cursor:pointer;
+  font-size:12px; font-weight:500; color:var(--t2);
+  transition:.18s; margin-bottom:2px; user-select:none;
+  border:1px solid transparent;
+}
+.nav-item:hover { background:rgba(255,255,255,.04); color:var(--t1); }
+.nav-item.active {
+  background:rgba(212,165,116,.1); border-color:rgba(212,165,116,.25);
+  color:var(--acc); font-weight:600;
+  box-shadow: inset 3px 0 0 var(--acc);
+}
+.nav-icon { font-size:14px; flex-shrink:0; }
+
+.sb-divider { border:none; border-top:1px solid var(--border); margin:10px 0; }
+
+/* ── FILTERS ── */
+.sb-filters { padding:0 12px 16px; flex:1; }
+.filter-group { margin-bottom:14px; }
+.filter-label {
+  font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--t3); display:block; margin-bottom:6px;
+}
+select.sf {
+  width:100%; background:rgba(255,255,255,.04); border:1px solid var(--border2);
+  color:var(--t1); font-family:'Montserrat',sans-serif; font-size:11.5px;
+  border-radius:7px; padding:7px 10px; cursor:pointer; transition:.18s; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234a6180'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 10px center; padding-right:26px;
+}
+select.sf:focus { outline:none; border-color:var(--acc2); }
+.rank-btns { display:flex; gap:4px; }
+.rb {
+  flex:1; background:rgba(255,255,255,.04); border:1px solid var(--border2);
+  color:var(--t2); font-family:'Montserrat',sans-serif; font-size:11px; font-weight:600;
+  border-radius:6px; padding:6px 0; cursor:pointer; text-align:center; transition:.18s;
+}
+.rb:hover { border-color:var(--border2); color:var(--t1); }
+.rb.active {
+  background:rgba(212,165,116,.14); border-color:rgba(212,165,116,.4);
+  color:var(--acc); font-weight:700;
+}
+.count-badge {
+  display:block; text-align:center; font-size:10.5px; color:var(--t3);
+  margin-top:10px; padding:6px 10px; background:rgba(255,255,255,.025);
+  border:1px solid var(--border); border-radius:5px;
+}
+.count-badge strong { color:var(--t2); }
+
+.sb-meta { padding:12px 14px; border-top:1px solid var(--border); margin-top:auto; }
+.sb-meta p { font-size:9.5px; color:var(--t4); line-height:1.6; }
+
+/* ── MAIN CONTENT ── */
+.main-wrap {
+  margin-left:var(--sw);
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-height:100vh;
+}
+
+.tab-panel { display:none; padding:24px 28px; flex:1; }
+.tab-panel.active { display:block; }
+
+/* ── PANEL HEADER ── */
+.panel-header { margin-bottom:22px; }
+.panel-title {
+  font-size:21px; font-weight:800; letter-spacing:-.025em;
+  color:var(--t1); margin-bottom:5px; line-height:1.2;
+}
+.panel-desc { font-size:11.5px; color:var(--t3); max-width:700px; line-height:1.65; }
+.panel-title span { color:var(--acc); }
+
+/* ── CARDS ── */
+.card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:10px; overflow:hidden; transition:.18s;
+}
+.card:hover { border-color:var(--border2); }
+.card-h {
+  padding:15px 20px 12px; border-bottom:1px solid var(--border);
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+}
+.card-t { font-size:13px; font-weight:700; color:var(--t1); }
+.card-s { font-size:10.5px; color:var(--t3); margin-top:3px; line-height:1.5; }
+.card-b { padding:16px 20px; }
+
+/* ── LEGEND ── */
+.legend { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+.li { display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--t2); }
+.ld { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+
+/* ── GRIDS ── */
+.gfull { margin-bottom:18px; }
+
+/* ── CHART SIZING ── */
+.ch-bar  { height:430px; position:relative; }
+.ch-sc   { height:400px; position:relative; }
+canvas { max-width:100%; }
+
+/* ── HEATMAP ── */
+#htWrap { overflow-x:auto; }
+.ht {
+  width:100%; min-width:600px;
+  border-collapse:separate; border-spacing:3px;
+  font-size:11px;
+}
+.ht th {
+  background:rgba(255,255,255,.04); color:var(--t3);
+  font-size:9.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  padding:7px 10px; text-align:center; border-radius:4px; white-space:nowrap;
+  font-family:'Montserrat',sans-serif;
+}
+.ht th:first-child { text-align:left; }
+.ht td {
+  padding:7px 10px; border-radius:5px; text-align:center;
+  font-size:11px; font-weight:500; transition:.15s;
+}
+.ht td:first-child {
+  text-align:left; font-family:'Oswald',sans-serif; font-size:12.5px;
+  font-weight:500; letter-spacing:.04em; color:var(--t1); white-space:nowrap;
+  text-transform:uppercase;
+  background:rgba(255,255,255,.03)!important; border:1px solid var(--border);
+}
+.ht td:nth-child(2) { background:transparent!important; font-family:'Montserrat',sans-serif; }
+.ht td:nth-child(3) { background:transparent!important; font-family:'Montserrat',sans-serif; font-size:10.5px; color:var(--t3); }
+.ht tr:hover td { opacity:.88; }
+
+/* Tier badges */
+.tb { display:inline-block; padding:2px 7px; border-radius:10px; font-size:9.5px; font-weight:700; font-family:'Montserrat',sans-serif; }
+.to { background:rgba(242,153,74,.18);  color:#f7b87b; }
+.ts { background:rgba(46,80,144,.20);   color:#7b96d4; }
+.tu { background:rgba(91,154,169,.20);  color:#7ec8d6; }
+
+/* ── PYTHAGOREAN CALCULATOR ── */
+.calc-layout {
+  display:grid; grid-template-columns:260px 1fr;
+  gap:22px; align-items:start;
+}
+.calc-inputs { display:flex; flex-direction:column; gap:13px; }
+.inp-g { display:flex; flex-direction:column; gap:5px; }
+.inp-l { font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--t3); }
+.inp-g select, .inp-g input {
+  background:rgba(255,255,255,.04); border:1px solid var(--border2); color:var(--t1);
+  font-family:'Montserrat',sans-serif; font-size:12.5px; border-radius:7px;
+  padding:8px 12px; width:100%; transition:.18s; appearance:none;
+}
+.inp-g select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234a6180'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; padding-right:26px; }
+.inp-g select:focus, .inp-g input:focus { outline:none; border-color:var(--acc2); background:rgba(255,255,255,.06); }
+.calc-btn {
+  background:rgba(212,165,116,.14); border:1px solid rgba(212,165,116,.35);
+  color:var(--acc); font-family:'Montserrat',sans-serif; font-size:12px; font-weight:700;
+  border-radius:7px; padding:9px; cursor:pointer; width:100%; transition:.18s;
+  letter-spacing:.03em; text-transform:uppercase;
+}
+.calc-btn:hover { background:rgba(212,165,116,.24); }
+.calc-formula { font-size:10.5px; color:var(--t4); line-height:1.7; margin-top:4px; }
+
+.calc-results { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.stat-box {
+  background:rgba(255,255,255,.03); border:1px solid var(--border);
+  border-radius:8px; padding:14px 16px;
+}
+.stat-box.hi { border-color:rgba(212,165,116,.35); background:rgba(212,165,116,.07); }
+.sb-lbl { font-size:9.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--t3); margin-bottom:6px; }
+.sb-val { font-size:24px; font-weight:800; color:var(--t1); line-height:1; }
+.sb-sub { font-size:10.5px; color:var(--t3); margin-top:5px; }
+
+/* Pace bars */
+.pace-row { margin:4px 0; }
+.pace-label { display:flex; justify-content:space-between; font-size:10px; color:var(--t3); margin-bottom:3px; }
+.pace-bar { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.pace-fill { height:100%; border-radius:3px; transition:.4s; }
+
+.verdict {
+  grid-column:1/-1; border-radius:8px; padding:14px 18px;
+  display:flex; align-items:flex-start; gap:12px;
+}
+.verdict.hot    { background:rgba(242,153,74,.10);  border:1px solid rgba(242,153,74,.35);  color:#f7b87b; }
+.verdict.cold   { background:rgba(91,154,169,.10);  border:1px solid rgba(91,154,169,.35);  color:#7ec8d6; }
+.verdict.stable { background:rgba(46,80,144,.10);   border:1px solid rgba(46,80,144,.35);   color:#7b96d4; }
+.verdict-icon { font-size:20px; flex-shrink:0; padding-top:1px; }
+.verdict-text strong { font-family:'Permanent Marker',cursive; font-size:16px; display:block; margin-bottom:4px; }
+.verdict-text p { font-size:11.5px; line-height:1.6; }
+
+.no-data { font-size:12px; color:var(--t3); padding:16px 0; grid-column:1/-1; }
+
+/* ── COACHING INTELLIGENCE ── */
+.coaching-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+.coaching-card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:10px; overflow:hidden; display:flex; flex-direction:column;
+}
+.coaching-card::before { content:''; display:block; height:4px; }
+.cc-reg::before { background:linear-gradient(90deg,#F2994A,#e07e2f); }
+.cc-ris::before { background:linear-gradient(90deg,#5B9AA9,#3d7a8a); }
+.cc-con::before { background:linear-gradient(90deg,#2E5090,#1e3570); }
+.cc-body { padding:16px 18px; flex:1; display:flex; flex-direction:column; }
+.cc-icon { font-size:22px; margin-bottom:8px; }
+.cc-title { font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; margin-bottom:4px; }
+.cc-reg .cc-title { color:#f7b87b; }
+.cc-ris .cc-title { color:#7ec8d6; }
+.cc-con .cc-title { color:#7b96d4; }
+.cc-desc { font-size:11px; color:var(--t3); margin-bottom:12px; line-height:1.5; }
+.cc-insight {
+  font-family:'Permanent Marker',cursive; font-size:12px; margin-bottom:12px;
+  padding:8px 12px; border-radius:6px; line-height:1.5;
+}
+.cc-reg .cc-insight { background:rgba(242,153,74,.10); color:#f7b87b; border-left:3px solid #F2994A; }
+.cc-ris .cc-insight { background:rgba(91,154,169,.10); color:#7ec8d6; border-left:3px solid #5B9AA9; }
+.cc-con .cc-insight { background:rgba(46,80,144,.10);  color:#7b96d4; border-left:3px solid #2E5090; }
+.cc-list { list-style:none; display:flex; flex-direction:column; gap:5px; flex:1; }
+.cc-list li {
+  display:flex; align-items:center; justify-content:space-between;
+  background:rgba(255,255,255,.025); border:1px solid var(--border);
+  border-radius:6px; padding:6px 10px; font-size:11px;
+}
+.cc-name {
+  font-family:'Oswald',sans-serif; font-size:13px; font-weight:500;
+  color:var(--t1); letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.cc-stat { font-size:10px; color:var(--t2); text-align:right; }
+.cc-rank { font-size:9px; color:var(--t3); }
+
+/* ── HEATMAP TAB EXTRAS ── */
+.heat-meta {
+  display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:16px;
+}
+.hm-item {
+  background:rgba(255,255,255,.025); border:1px solid var(--border);
+  border-radius:7px; padding:10px 12px; text-align:center;
+}
+.hm-label { font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--t3); margin-bottom:4px; }
+.hm-val { font-size:17px; font-weight:800; color:var(--t1); }
+.hm-sub { font-size:10px; color:var(--t3); margin-top:2px; }
+
+/* ── SECTION LABEL ── */
+.sec-label {
+  display:flex; align-items:center; gap:8px;
+  font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--t3); margin-bottom:14px;
+}
+.sec-label::before { content:''; width:3px; height:14px; background:var(--acc); border-radius:2px; flex-shrink:0; }
+
+/* ── DATA DICTIONARY ── */
+.dict-section { margin-bottom:28px; }
+.dict-section-title {
+  font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--t3); margin-bottom:12px; padding-bottom:8px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:8px;
+}
+.dict-section-title::before { content:''; width:3px; height:13px; background:var(--acc); border-radius:2px; flex-shrink:0; }
+.dict-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:10px;
+}
+.dict-card {
+  background:rgba(255,255,255,.025); border:1px solid var(--border);
+  border-radius:8px; padding:13px 15px;
+  transition:.15s;
+}
+.dict-card:hover { border-color:var(--border2); background:rgba(255,255,255,.035); }
+.dict-abbr {
+  font-family:'Oswald',sans-serif; font-size:14px; font-weight:600;
+  color:var(--acc); letter-spacing:.05em; text-transform:uppercase;
+  margin-bottom:2px;
+}
+.dict-name {
+  font-size:10.5px; font-weight:700; color:var(--t2);
+  margin-bottom:5px; letter-spacing:.02em;
+}
+.dict-def {
+  font-size:11px; color:var(--t3); line-height:1.6;
+}
+
+/* ── MOBILE ── */
+@media(max-width:860px) {
+  .sidebar { width:100%; position:relative; height:auto; }
+  .main-wrap { margin-left:0; }
+  body { flex-direction:column; }
+  .coaching-grid, .heat-meta { grid-template-columns:1fr; }
+  .calc-layout { grid-template-columns:1fr; }
+  .calc-results { grid-template-columns:1fr 1fr; }
+  .dict-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+
+  <div class="sb-brand">
+    <div class="sb-badge">&#9889; Fraud Check</div>
+    <div class="sb-title">Softball Volatility<br>Tracker 2025</div>
+    <div class="sb-sub">Pythagorean Expectation<br>vs Actual Wins</div>
+  </div>
+
+  <div class="sb-section-label">Navigation</div>
+  <ul class="nav-list">
+    <li class="nav-item active" data-tab="fraud">
+      <span class="nav-icon">&#128202;</span> Fraud Check
+    </li>
+    <li class="nav-item" data-tab="volatility">
+      <span class="nav-icon">&#127777;&#65039;</span> Volatility Grid
+    </li>
+    <li class="nav-item" data-tab="calc">
+      <span class="nav-icon">&#128201;</span> Pythagorean Calc
+    </li>
+    <li class="nav-item" data-tab="coaching">
+      <span class="nav-icon">&#127942;</span> Coaching Intel
+    </li>
+    <li class="nav-item" data-tab="dict">
+      <span class="nav-icon">&#128218;</span> Data Dictionary
+    </li>
+  </ul>
+
+  <hr class="sb-divider">
+
+  <div class="sb-section-label">Filters</div>
+  <div class="sb-filters">
+    <div class="filter-group">
+      <label class="filter-label" for="confSelect">Conference</label>
+      <select class="sf" id="confSelect">
+        <option value="all">All Conferences</option>
+<option value="ACC">ACC</option>
+<option value="ASUN">ASUN</option>
+<option value="America East">America East</option>
+<option value="American">American</option>
+<option value="Atlantic 10">Atlantic 10</option>
+<option value="Big 12">Big 12</option>
+<option value="Big East">Big East</option>
+<option value="Big Sky">Big Sky</option>
+<option value="Big South">Big South</option>
+<option value="Big Ten">Big Ten</option>
+<option value="Big West">Big West</option>
+<option value="Coastal Athletic">Coastal Athletic</option>
+<option value="Conference USA">Conference USA</option>
+<option value="Horizon League">Horizon League</option>
+<option value="Ivy League">Ivy League</option>
+<option value="MAAC">MAAC</option>
+<option value="MEAC">MEAC</option>
+<option value="Mid-American">Mid-American</option>
+<option value="Missouri Valley">Missouri Valley</option>
+<option value="Mountain West">Mountain West</option>
+<option value="NEC">NEC</option>
+<option value="Ohio Valley">Ohio Valley</option>
+<option value="Patriot League">Patriot League</option>
+<option value="SEC">SEC</option>
+<option value="SWAC">SWAC</option>
+<option value="Southern">Southern</option>
+<option value="Southland">Southland</option>
+<option value="Sun Belt">Sun Belt</option>
+<option value="The Summit League">The Summit League</option>
+<option value="West Coast">West Coast</option>
+<option value="Western Athletic">Western Athletic</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Field</label>
+      <div class="rank-btns">
+        <button class="rb active" data-rank="all">All</button>
+        <button class="rb" data-rank="top25">Top 25</button>
+        <button class="rb" data-rank="top50">Top 50</button>
+      </div>
+    </div>
+    <span id="countBadge" class="count-badge"><strong>240</strong> teams shown</span>
+  </div>
+
+  <div class="sb-meta">
+    <p>Rank proxy: <strong style="color:#8fa3be">Rank_x</strong> (composite system ranking 1&ndash;304). Top 25/50 filters match estimated USA Softball contender field.</p>
+  </div>
+</div>
+<div class="main-wrap">
+
+
+<div id="panel-fraud" class="tab-panel active">
+  <div class="panel-header">
+    <div class="panel-title">Fraud <span>Check</span></div>
+    <div class="panel-desc">Top 20 teams most misaligned with run differential, and volatility mapped against schedule strength. Use the scatter to identify structural inflation vs hidden strength.</div>
+  </div>
+
+  <div class="gfull">
+    <div class="card">
+      <div class="card-h">
+        <div>
+          <div class="card-t">Teams Most Misaligned with Run Differential</div>
+          <div class="card-s">Top 20 by |Fraud Delta| within current filter &middot; positive = outperforming run diff &middot; negative = underperforming</div>
+        </div>
+        <div class="legend">
+          <div class="li"><div class="ld" style="background:#F2994A"></div>Regression Candidates</div>
+          <div class="li"><div class="ld" style="background:#2E5090"></div>True Contenders</div>
+          <div class="li"><div class="ld" style="background:#5B9AA9"></div>Late-Season Risers</div>
+        </div>
+      </div>
+      <div class="card-b"><div class="ch-bar"><canvas id="barCanvas"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="gfull">
+    <div class="card">
+      <div class="card-h">
+        <div>
+          <div class="card-t">Volatility vs Schedule Strength</div>
+          <div class="card-s">Fraud Delta (y-axis) vs SOS (x-axis) &middot; all teams in current filter &middot; dashed lines divide quadrants at FD=0 and SOS=0.35</div>
+        </div>
+      </div>
+      <div class="card-b">
+        <div class="ch-sc"><canvas id="scatterCanvas"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-volatility" class="tab-panel">
+  <div class="panel-header">
+    <div class="panel-title">Volatility <span>Signature Grid</span></div>
+    <div class="panel-desc">Top 40 teams by Strength Score within current filter. Cell color uses the Stat Leader sequential palette (dark blue = low, sky blue = high) across SOS, TSR, PYTHAG, and Fraud Delta.</div>
+  </div>
+
+  <div class="heat-meta">
+    <div class="hm-item">
+      <div class="hm-label">Regression Candidates</div>
+      <div class="hm-val" id="hmOver" style="color:#f7b87b">&#8212;</div>
+      <div class="hm-sub">in current filter</div>
+    </div>
+    <div class="hm-item">
+      <div class="hm-label">True Contenders</div>
+      <div class="hm-val" id="hmStabl" style="color:#7b96d4">&#8212;</div>
+      <div class="hm-sub">in current filter</div>
+    </div>
+    <div class="hm-item">
+      <div class="hm-label">Late-Season Risers</div>
+      <div class="hm-val" id="hmUnder" style="color:#7ec8d6">&#8212;</div>
+      <div class="hm-sub">in current filter</div>
+    </div>
+    <div class="hm-item">
+      <div class="hm-label">Avg SOS</div>
+      <div class="hm-val" id="hmAvgSos" style="color:#87CEEB">&#8212;</div>
+      <div class="hm-sub">filter average</div>
+    </div>
+    <div class="hm-item">
+      <div class="hm-label">Avg Fraud &Delta;</div>
+      <div class="hm-val" id="hmAvgFd" style="color:#D4A574">&#8212;</div>
+      <div class="hm-sub">filter average</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">
+      <div>
+        <div class="card-t">Top 40 Teams &mdash; Multi-Metric Heat View</div>
+        <div class="card-s">Sorted by Strength Score &middot; Cell color = relative value within column (Stat Leader sequential palette)</div>
+      </div>
+      <div class="legend">
+        <div class="li"><div class="ld" style="background:#F2994A"></div>Regression</div>
+        <div class="li"><div class="ld" style="background:#2E5090"></div>Contender</div>
+        <div class="li"><div class="ld" style="background:#5B9AA9"></div>Riser</div>
+      </div>
+    </div>
+    <div class="card-b">
+      <div id="htWrap"><table class="ht" id="heatTable"></table></div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-calc" class="tab-panel">
+  <div class="panel-header">
+    <div class="panel-title">Pythagorean <span>Regression Calculator</span></div>
+    <div class="panel-desc">Project where any team's final record should land based on run differential. Compares actual win pace vs Pythagorean expectation and flags hot/cold streaks with a verdict.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">
+      <div>
+        <div class="card-t">Season Projection Tool</div>
+        <div class="card-s">Uses Runs For, Runs Against &amp; current game log &mdash; falls back to precomputed PYTHAG if per-game run data is unavailable</div>
+      </div>
+    </div>
+    <div class="card-b">
+      <div class="calc-layout">
+        <div class="calc-inputs">
+          <div class="inp-g">
+            <label class="inp-l" for="calcTeam">Team</label>
+            <select id="calcTeam"><option value="">-- Select a team --</option></select>
+          </div>
+          <div class="inp-g">
+            <label class="inp-l" for="calcSeason">Total Season Games</label>
+            <input type="number" id="calcSeason" value="56" min="10" max="80">
+          </div>
+          <button class="calc-btn" id="calcBtn">Run Projection &#8594;</button>
+          <div class="calc-formula">
+            <strong style="color:#8fa3be">Formula:</strong><br>
+            PYTHAG = RF&sup2; &divide; (RF&sup2; + RA&sup2;)<br>
+            Proj. Wins = Current Wins + (PYTHAG &times; Games Remaining)<br>
+            Fraud Delta = Actual Win% &minus; PYTHAG
+          </div>
+        </div>
+        <div class="calc-results" id="calcResults">
+          <p class="no-data">Select a team to see the projection.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-coaching" class="tab-panel">
+  <div class="panel-header">
+    <div class="panel-title">Coaching <span>Intelligence</span></div>
+    <div class="panel-desc">Actionable team lists derived from Fraud Tier, SOS, and TSR. Use these to shape scouting focus, opponent preparation, and bracket projection strategy.</div>
+  </div>
+
+  <div class="coaching-grid">
+
+    <div class="coaching-card cc-reg">
+      <div class="cc-body">
+        <div class="cc-icon">&#128201;</div>
+        <div class="cc-title">Regression Candidates</div>
+        <div class="cc-desc">Overperforming + Weak SOS (&lt;0.35). Record built against soft competition &mdash; expect late-season cooling.</div>
+        <div class="cc-insight">Watch the schedule flip. Wins look good now, but the numbers say the floor is coming.</div>
+        <ul class="cc-list" id="regList"></ul>
+      </div>
+    </div>
+
+    <div class="coaching-card cc-ris">
+      <div class="cc-body">
+        <div class="cc-icon">&#128200;</div>
+        <div class="cc-title">Potential Late-Season Risers</div>
+        <div class="cc-desc">Underperforming + High TSR (&gt;1.5). Metrics say this team is better than their record. Late surge likely.</div>
+        <div class="cc-insight">Don't sleep on the W-L. The underlying stuff is quietly cooking.</div>
+        <ul class="cc-list" id="risList"></ul>
+      </div>
+    </div>
+
+    <div class="coaching-card cc-con">
+      <div class="cc-body">
+        <div class="cc-icon">&#127942;</div>
+        <div class="cc-title">True Contenders</div>
+        <div class="cc-desc">Stable + High SOS (&gt;0.45). Record validated against quality competition &mdash; the real deal.</div>
+        <div class="cc-insight">SOS doesn't lie. These teams have earned every win.</div>
+        <ul class="cc-list" id="conList"></ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="panel-dict" class="tab-panel">
+  <div class="panel-header">
+    <div class="panel-title">Data <span>Dictionary</span></div>
+    <div class="panel-desc">Definitions for all metrics used in this dashboard. PEARatings proprietary metrics are labeled accordingly. Dashboard-computed fields are noted where applicable.</div>
+  </div>
+
+  <!-- Section 1: Dashboard Intelligence -->
+  <div class="dict-section">
+    <div class="dict-section-title">Dashboard Intelligence</div>
+    <div class="dict-grid">
+      <div class="dict-card">
+        <div class="dict-abbr">Fraud Delta</div>
+        <div class="dict-name">FD &mdash; Dashboard Computed</div>
+        <div class="dict-def">Actual Win% minus Pythagorean Win%. Positive values indicate outperformance (running hot); negative values indicate underperformance (running cold) relative to run differential.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">Fraud Tier</div>
+        <div class="dict-name">Classification &mdash; Dashboard Computed</div>
+        <div class="dict-def">Categorical label based on Fraud Delta thresholds. <strong style="color:#f7b87b">Regression Candidates</strong>: FD &gt; threshold. <strong style="color:#7b96d4">True Contenders</strong>: FD near zero. <strong style="color:#7ec8d6">Late-Season Risers</strong>: FD below threshold.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">SOS / SOS_clean</div>
+        <div class="dict-name">Strength of Schedule</div>
+        <div class="dict-def">A measure of the average quality of opponents faced. Higher values indicate a tougher schedule. SOS_clean is the pre-processed version used in dashboard calculations. Scale: 0.0 (weakest) to ~0.8 (elite).</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">Rank_x</div>
+        <div class="dict-name">Composite Ranking Proxy</div>
+        <div class="dict-def">Composite system ranking from 1 to 304. Used as a proxy for USA Softball top-25 rankings since no official list is embedded in the dataset. Teams ranked 1&ndash;25 represent the estimated contender field.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">Strength Score</div>
+        <div class="dict-name">Composite Strength Metric</div>
+        <div class="dict-def">Composite metric combining multiple performance dimensions (TSR, SOS, record quality) into a single strength estimate. Used to sort teams in the Volatility Grid top-40 view.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">NET</div>
+        <div class="dict-name">Net Win Rate</div>
+        <div class="dict-def">Decimal win-rate metric ranging from 0 to 1. Represents overall winning percentage in a normalized format, factoring in game context where applicable.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: PEARatings Core Metrics -->
+  <div class="dict-section">
+    <div class="dict-section-title">PEARatings Core Metrics</div>
+    <div class="dict-grid">
+      <div class="dict-card">
+        <div class="dict-abbr">TSR</div>
+        <div class="dict-name">Team Strength Rating</div>
+        <div class="dict-def">PEAR's primary composite team quality metric. Synthesizes pitching, offense, and schedule context into a single strength estimate. Higher is better.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">WAR</div>
+        <div class="dict-name">Wins Above Replacement (PEAR Approx.)</div>
+        <div class="dict-def">PEAR's approximation of Wins Above Replacement. Estimates how many additional wins a team contributes compared to a replacement-level baseline in context of the dataset.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">WPOE</div>
+        <div class="dict-name">Win Percentage Over Expected</div>
+        <div class="dict-def">Measures "luck" &mdash; the gap between actual win percentage and what the team's underlying metrics would predict. A high WPOE signals positive variance; a low WPOE signals likely regression.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">PYTHAG</div>
+        <div class="dict-name">Pythagorean Win Percentage</div>
+        <div class="dict-def">Expected win percentage derived from runs scored (RF) and runs allowed (RA): RF&sup2; &divide; (RF&sup2; + RA&sup2;). Predicts what a team's record "should" be based purely on run differential.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">KSHOTS</div>
+        <div class="dict-name">Killshots</div>
+        <div class="dict-def">An inning in which a team scores 2 or more runs while allowing zero. Represents game-changing, high-leverage scoring bursts that often decide outcomes.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">CONCD</div>
+        <div class="dict-name">Conceded Killshots</div>
+        <div class="dict-def">Killshot innings surrendered to the opponent. Measures defensive/pitching vulnerability in high-leverage situations.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">KSHOT R</div>
+        <div class="dict-name">Killshot Ratio</div>
+        <div class="dict-def">Ratio of Killshots scored to Conceded Killshots. Values above 1.0 indicate the team creates more game-deciding bursts than it concedes. Key indicator of clutch performance.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">KSHOTS/G</div>
+        <div class="dict-name">Killshots Per Game</div>
+        <div class="dict-def">Average number of Killshot innings scored per game. Normalizes raw killshot totals to per-game rate to allow fair comparison across teams with different game totals.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">CONCD/G</div>
+        <div class="dict-name">Conceded Killshots Per Game</div>
+        <div class="dict-def">Average number of Killshot innings surrendered per game. Lower values indicate more consistent defensive performance in high-leverage moments.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Pitching & Defense -->
+  <div class="dict-section">
+    <div class="dict-section-title">Pitching &amp; Defense</div>
+    <div class="dict-grid">
+      <div class="dict-card">
+        <div class="dict-abbr">ERA</div>
+        <div class="dict-name">Earned Run Average</div>
+        <div class="dict-def">Average number of earned runs allowed per 7 innings pitched (softball standard). Lower ERA = better pitching performance. Unearned runs (via errors) are excluded.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">WHIP</div>
+        <div class="dict-name">Walks + Hits Per Inning Pitched</div>
+        <div class="dict-def">Measures baserunner efficiency: (Walks + Hits) &divide; Innings Pitched. A WHIP below 1.0 is elite; above 1.5 signals significant baserunner exposure. Lower is better.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">K/7</div>
+        <div class="dict-name">Strikeouts Per 7 Innings</div>
+        <div class="dict-def">Strikeout rate normalized to a 7-inning softball game. Higher values indicate a more dominant strikeout pitcher. Allows comparison regardless of total innings pitched.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">PCT</div>
+        <div class="dict-name">Fielding Percentage</div>
+        <div class="dict-def">Proportion of defensive plays converted without an error: (Putouts + Assists) &divide; (Putouts + Assists + Errors). Higher is better. The softball standard for elite defense is .970+.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: Offense -->
+  <div class="dict-section">
+    <div class="dict-section-title">Offense</div>
+    <div class="dict-grid">
+      <div class="dict-card">
+        <div class="dict-abbr">RPG</div>
+        <div class="dict-name">Runs Per Game</div>
+        <div class="dict-def">Average runs scored per game. Primary input for Pythagorean Win% calculations in this dashboard. Used as proxy for Runs For (RF) when total RF is unavailable.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">BA</div>
+        <div class="dict-name">Batting Average</div>
+        <div class="dict-def">Hits &divide; At Bats. The classic measure of contact hitting ability. Does not capture walks or extra-base value. Often used alongside OBP and SLG for a fuller offensive picture.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">OBP</div>
+        <div class="dict-name">On Base Percentage</div>
+        <div class="dict-def">(Hits + Walks + HBP) &divide; (At Bats + Walks + HBP + SF). Measures how frequently a batter reaches base by any means. OBP is a stronger predictor of run scoring than BA alone.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">SLG</div>
+        <div class="dict-name">Slugging Percentage</div>
+        <div class="dict-def">Total Bases &divide; At Bats. Weights hits by their extra-base value (1B=1, 2B=2, 3B=3, HR=4). Measures raw power output. Higher values indicate more extra-base production.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">OPS</div>
+        <div class="dict-name">On Base Plus Slugging</div>
+        <div class="dict-def">OBP + SLG. Simple but powerful combined offensive metric capturing both plate discipline and power. A team OPS above .800 is considered strong in collegiate softball.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 5: Rankings & Record -->
+  <div class="dict-section">
+    <div class="dict-section-title">Rankings &amp; Record Context</div>
+    <div class="dict-grid">
+      <div class="dict-card">
+        <div class="dict-abbr">ELO</div>
+        <div class="dict-name">ELO Rating</div>
+        <div class="dict-def">Adaptive ranking system where teams gain/lose points based on game outcomes and opponent strength. Self-correcting over time &mdash; a strong rating reflects sustained performance against quality competition.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">RPI</div>
+        <div class="dict-name">Ratings Percentage Index</div>
+        <div class="dict-def">Weighted formula: 25% Win% + 50% Opponents' Win% + 25% Opponents' Opponents' Win%. Heavily influenced by schedule quality. Commonly used in NCAA selection criteria.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">RQI</div>
+        <div class="dict-name">Record Quality Index</div>
+        <div class="dict-def">Composite metric evaluating the quality of a team's wins and losses. A team with a .500 record against top-25 opponents will rank higher than a .500 team that played weaker opposition.</div>
+      </div>
+      <div class="dict-card">
+        <div class="dict-abbr">Q1 &ndash; Q4</div>
+        <div class="dict-name">Quadrant Records</div>
+        <div class="dict-def">Win-loss record split by opponent quality quadrant. Q1 = top opponents (most predictive for NCAA selection); Q4 = weakest opponents. NCAA uses quadrant records to evaluate resume quality and compare teams.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const RAW_DATA = [{"team": "Charlotte", "conference": "American", "rank": 81, "fraud_delta": 0.769, "abs_fd": 0.769, "sos": 0.42, "tsr": 2.08, "pythag": 0, "strength": 0.7211, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.769, "wins": 10, "losses": 3, "games": 13, "rpg": 0.0, "ra_total": 0}, {"team": "Stanford", "conference": "ACC", "rank": 13, "fraud_delta": 0.727, "abs_fd": 0.727, "sos": 0.265, "tsr": 7.05, "pythag": 0, "strength": 2.139, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.727, "wins": 8, "losses": 3, "games": 11, "rpg": 0.0, "ra_total": 0}, {"team": "Texas A&M", "conference": "SEC", "rank": 8, "fraud_delta": 0.692, "abs_fd": 0.692, "sos": 0.312, "tsr": 8.11, "pythag": 0, "strength": 2.4727, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.692, "wins": 9, "losses": 4, "games": 13, "rpg": 0.0, "ra_total": 0}, {"team": "Cornell", "conference": "Ivy League", "rank": 240, "fraud_delta": 0.5, "abs_fd": 0.5, "sos": 0.0, "tsr": -2.89, "pythag": 0, "strength": -0.8633, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.5, "wins": 1, "losses": 1, "games": 2, "rpg": 0.0, "ra_total": 0}, {"team": "Syracuse", "conference": "ACC", "rank": 126, "fraud_delta": 0.38, "abs_fd": 0.38, "sos": 0.477, "tsr": 0.38, "pythag": 0.22, "strength": 0.3405, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.6, "wins": 6, "losses": 4, "games": 10, "rpg": 3.5, "ra_total": 56}, {"team": "Delaware St.", "conference": "MEAC", "rank": 288, "fraud_delta": 0.356, "abs_fd": 0.356, "sos": 0.775, "tsr": -5.78, "pythag": 0.073, "strength": -1.5066, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.429, "wins": 3, "losses": 4, "games": 7, "rpg": 1.7, "ra_total": 20}, {"team": "Rhode Island", "conference": "Atlantic 10", "rank": 244, "fraud_delta": 0.336, "abs_fd": 0.336, "sos": 0.58, "tsr": -3.06, "pythag": 0.264, "strength": -0.6315, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.6, "wins": 3, "losses": 2, "games": 5, "rpg": 1.3, "ra_total": 7}, {"team": "Bryant", "conference": "America East", "rank": 201, "fraud_delta": 0.322, "abs_fd": 0.322, "sos": 0.479, "tsr": -1.71, "pythag": 0.122, "strength": -0.3342, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.444, "wins": 4, "losses": 5, "games": 9, "rpg": 2.1, "ra_total": 56}, {"team": "Quinnipiac", "conference": "MAAC", "rank": 248, "fraud_delta": 0.303, "abs_fd": 0.303, "sos": 0.468, "tsr": -3.24, "pythag": 0.126, "strength": -0.7974, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.429, "wins": 3, "losses": 4, "games": 7, "rpg": 3.2, "ra_total": 46}, {"team": "Bowling Green", "conference": "Mid-American", "rank": 171, "fraud_delta": 0.282, "abs_fd": 0.282, "sos": 0.757, "tsr": -0.85, "pythag": 0.607, "strength": 0.2369, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.889, "wins": 8, "losses": 1, "games": 9, "rpg": 9.4, "ra_total": 52}, {"team": "North Dakota", "conference": "The Summit League", "rank": 190, "fraud_delta": 0.264, "abs_fd": 0.264, "sos": 0.476, "tsr": -1.19, "pythag": 0.198, "strength": -0.1423, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 2.7, "ra_total": 58}, {"team": "Belmont", "conference": "Missouri Valley", "rank": 87, "fraud_delta": 0.262, "abs_fd": 0.262, "sos": 0.355, "tsr": 1.79, "pythag": 0.405, "strength": 0.804, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.667, "wins": 8, "losses": 4, "games": 12, "rpg": 3.3, "ra_total": 37}, {"team": "Providence", "conference": "Big East", "rank": 191, "fraud_delta": 0.244, "abs_fd": 0.244, "sos": 0.219, "tsr": -1.23, "pythag": 0.042, "strength": -0.3348, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.286, "wins": 2, "losses": 5, "games": 7, "rpg": 1.2, "ra_total": 33}, {"team": "UTEP", "conference": "Conference USA", "rank": 147, "fraud_delta": 0.221, "abs_fd": 0.221, "sos": 0.473, "tsr": -0.02, "pythag": 0.279, "strength": 0.2463, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 6, "losses": 6, "games": 12, "rpg": 6.3, "ra_total": 126}, {"team": "Winthrop", "conference": "Big South", "rank": 218, "fraud_delta": 0.214, "abs_fd": 0.214, "sos": 0.504, "tsr": -2.15, "pythag": 0.203, "strength": -0.415, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.417, "wins": 5, "losses": 7, "games": 12, "rpg": 3.6, "ra_total": 76}, {"team": "Harvard", "conference": "Ivy League", "rank": 183, "fraud_delta": 0.213, "abs_fd": 0.213, "sos": 0.32, "tsr": -1.07, "pythag": 0.358, "strength": -0.0974, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.571, "wins": 4, "losses": 3, "games": 7, "rpg": 2.0, "ra_total": 11}, {"team": "UTSA", "conference": "American", "rank": 170, "fraud_delta": 0.212, "abs_fd": 0.212, "sos": 0.308, "tsr": -0.85, "pythag": 0.243, "strength": -0.0971, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.455, "wins": 5, "losses": 6, "games": 11, "rpg": 4.0, "ra_total": 67}, {"team": "Southern Utah", "conference": "Western Athletic", "rank": 129, "fraud_delta": 0.202, "abs_fd": 0.202, "sos": 0.28, "tsr": 0.28, "pythag": 0.26, "strength": 0.2413, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 4.0, "ra_total": 78}, {"team": "Alabama A&M", "conference": "SWAC", "rank": 294, "fraud_delta": 0.196, "abs_fd": 0.196, "sos": 0.912, "tsr": -6.42, "pythag": 0.471, "strength": -1.4913, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.667, "wins": 8, "losses": 4, "games": 12, "rpg": 9.0, "ra_total": 96}, {"team": "James Madison", "conference": "Sun Belt", "rank": 118, "fraud_delta": 0.188, "abs_fd": 0.188, "sos": 0.26, "tsr": 0.74, "pythag": 0.145, "strength": 0.3172, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.333, "wins": 3, "losses": 6, "games": 9, "rpg": 3.1, "ra_total": 58}, {"team": "Mercer", "conference": "Southern", "rank": 89, "fraud_delta": 0.179, "abs_fd": 0.179, "sos": 0.603, "tsr": 1.75, "pythag": 0.571, "strength": 0.9729, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.75, "wins": 9, "losses": 3, "games": 12, "rpg": 7.6, "ra_total": 65}, {"team": "Kent St.", "conference": "Mid-American", "rank": 197, "fraud_delta": 0.175, "abs_fd": 0.175, "sos": 0.686, "tsr": -1.52, "pythag": 0.492, "strength": -0.0298, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.667, "wins": 8, "losses": 4, "games": 12, "rpg": 6.2, "ra_total": 57}, {"team": "Massachusetts", "conference": "Mid-American", "rank": 235, "fraud_delta": 0.166, "abs_fd": 0.166, "sos": 0.578, "tsr": -2.55, "pythag": 0.296, "strength": -0.4637, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 3.8, "ra_total": 61}, {"team": "Drexel", "conference": "Coastal Athletic", "rank": 259, "fraud_delta": 0.166, "abs_fd": 0.166, "sos": 0.706, "tsr": -3.95, "pythag": 0.405, "strength": -0.799, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.571, "wins": 4, "losses": 3, "games": 7, "rpg": 6.0, "ra_total": 37}, {"team": "Prairie View", "conference": "SWAC", "rank": 233, "fraud_delta": 0.16, "abs_fd": 0.16, "sos": 0.577, "tsr": -2.5, "pythag": 0.34, "strength": -0.4279, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 5, "losses": 5, "games": 10, "rpg": 4.3, "ra_total": 56}, {"team": "Towson", "conference": "Coastal Athletic", "rank": 242, "fraud_delta": 0.156, "abs_fd": 0.156, "sos": 0.545, "tsr": -2.94, "pythag": 0.344, "strength": -0.5695, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 5, "losses": 5, "games": 10, "rpg": 5.6, "ra_total": 64}, {"team": "Gardner-Webb", "conference": "Big South", "rank": 163, "fraud_delta": 0.155, "abs_fd": 0.155, "sos": 0.699, "tsr": -0.6, "pythag": 0.481, "strength": 0.2419, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.636, "wins": 7, "losses": 4, "games": 11, "rpg": 7.7, "ra_total": 72}, {"team": "Bethune-Cookman", "conference": "SWAC", "rank": 230, "fraud_delta": 0.153, "abs_fd": 0.153, "sos": 0.39, "tsr": -2.41, "pythag": 0.061, "strength": -0.609, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.214, "wins": 3, "losses": 11, "games": 14, "rpg": 1.7, "ra_total": 85}, {"team": "Creighton", "conference": "Big East", "rank": 158, "fraud_delta": 0.143, "abs_fd": 0.143, "sos": 0.371, "tsr": -0.43, "pythag": 0.274, "strength": 0.0816, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.417, "wins": 5, "losses": 7, "games": 12, "rpg": 3.7, "ra_total": 63}, {"team": "Oklahoma St.", "conference": "Big 12", "rank": 15, "fraud_delta": 0.136, "abs_fd": 0.136, "sos": 0.192, "tsr": 6.62, "pythag": 0.578, "strength": 2.2857, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.714, "wins": 10, "losses": 4, "games": 14, "rpg": 6.3, "ra_total": 53}, {"team": "Utah Valley", "conference": "Western Athletic", "rank": 122, "fraud_delta": 0.13, "abs_fd": 0.13, "sos": 0.46, "tsr": 0.53, "pythag": 0.485, "strength": 0.5114, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.615, "wins": 8, "losses": 5, "games": 13, "rpg": 6.2, "ra_total": 64}, {"team": "Baylor", "conference": "Big 12", "rank": 31, "fraud_delta": 0.128, "abs_fd": 0.128, "sos": 0.354, "tsr": 5.04, "pythag": 0.705, "strength": 1.9273, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.833, "wins": 10, "losses": 2, "games": 12, "rpg": 6.0, "ra_total": 41}, {"team": "Presbyterian", "conference": "Big South", "rank": 241, "fraud_delta": 0.126, "abs_fd": 0.126, "sos": 0.733, "tsr": -2.93, "pythag": 0.419, "strength": -0.4844, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.545, "wins": 6, "losses": 5, "games": 11, "rpg": 4.0, "ra_total": 43}, {"team": "Chattanooga", "conference": "Southern", "rank": 135, "fraud_delta": 0.126, "abs_fd": 0.126, "sos": 0.492, "tsr": 0.17, "pythag": 0.374, "strength": 0.3611, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 6, "losses": 6, "games": 12, "rpg": 4.3, "ra_total": 57}, {"team": "Liberty", "conference": "Conference USA", "rank": 76, "fraud_delta": 0.124, "abs_fd": 0.124, "sos": 0.178, "tsr": 2.24, "pythag": 0.126, "strength": 0.7441, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.25, "wins": 3, "losses": 9, "games": 12, "rpg": 2.4, "ra_total": 69}, {"team": "Utah", "conference": "Big 12", "rank": 60, "fraud_delta": 0.123, "abs_fd": 0.123, "sos": 0.384, "tsr": 2.85, "pythag": 0.646, "strength": 1.2573, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.769, "wins": 10, "losses": 3, "games": 13, "rpg": 5.0, "ra_total": 36}, {"team": "East Carolina", "conference": "American", "rank": 86, "fraud_delta": 0.121, "abs_fd": 0.121, "sos": 0.408, "tsr": 1.81, "pythag": 0.417, "strength": 0.842, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 4.1, "ra_total": 54}, {"team": "McNeese", "conference": "Southland", "rank": 57, "fraud_delta": 0.117, "abs_fd": 0.117, "sos": 0.387, "tsr": 2.99, "pythag": 0.616, "strength": 1.2856, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.733, "wins": 11, "losses": 4, "games": 15, "rpg": 7.5, "ra_total": 75}, {"team": "Wofford", "conference": "Southern", "rank": 119, "fraud_delta": 0.116, "abs_fd": 0.116, "sos": 0.804, "tsr": 0.65, "pythag": 0.801, "strength": 0.7897, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.917, "wins": 11, "losses": 1, "games": 12, "rpg": 7.5, "ra_total": 35}, {"team": "George Mason", "conference": "Atlantic 10", "rank": 220, "fraud_delta": 0.116, "abs_fd": 0.116, "sos": 0.565, "tsr": -2.18, "pythag": 0.455, "strength": -0.2786, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.571, "wins": 4, "losses": 3, "games": 7, "rpg": 5.8, "ra_total": 32}, {"team": "Clemson", "conference": "ACC", "rank": 37, "fraud_delta": 0.115, "abs_fd": 0.115, "sos": 0.272, "tsr": 3.91, "pythag": 0.5, "strength": 1.4486, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.615, "wins": 8, "losses": 5, "games": 13, "rpg": 5.0, "ra_total": 55}, {"team": "Murray St.", "conference": "Missouri Valley", "rank": 160, "fraud_delta": 0.113, "abs_fd": 0.113, "sos": 0.51, "tsr": -0.51, "pythag": 0.349, "strength": 0.1521, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 3.7, "ra_total": 52}, {"team": "Wichita St.", "conference": "American", "rank": 74, "fraud_delta": 0.113, "abs_fd": 0.113, "sos": 0.223, "tsr": 2.28, "pythag": 0.387, "strength": 0.892, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.5, "wins": 5, "losses": 5, "games": 10, "rpg": 4.4, "ra_total": 45}, {"team": "UC Davis", "conference": "Big West", "rank": 116, "fraud_delta": 0.112, "abs_fd": 0.112, "sos": 0.48, "tsr": 0.82, "pythag": 0.471, "strength": 0.6005, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.583, "wins": 7, "losses": 5, "games": 12, "rpg": 4.5, "ra_total": 48}, {"team": "Kentucky", "conference": "SEC", "rank": 34, "fraud_delta": 0.111, "abs_fd": 0.111, "sos": 0.31, "tsr": 4.49, "pythag": 0.603, "strength": 1.6865, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.714, "wins": 10, "losses": 4, "games": 14, "rpg": 5.4, "ra_total": 47}, {"team": "Texas St.", "conference": "Sun Belt", "rank": 45, "fraud_delta": 0.105, "abs_fd": 0.105, "sos": 0.313, "tsr": 3.57, "pythag": 0.51, "strength": 1.3665, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.615, "wins": 8, "losses": 5, "games": 13, "rpg": 5.0, "ra_total": 44}, {"team": "Delaware", "conference": "Conference USA", "rank": 200, "fraud_delta": 0.104, "abs_fd": 0.104, "sos": 0.526, "tsr": -1.59, "pythag": 0.296, "strength": -0.1935, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.4, "wins": 6, "losses": 9, "games": 15, "rpg": 4.0, "ra_total": 77}, {"team": "Iowa", "conference": "Big Ten", "rank": 43, "fraud_delta": 0.101, "abs_fd": 0.101, "sos": 0.437, "tsr": 3.66, "pythag": 0.626, "strength": 1.511, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.727, "wins": 8, "losses": 3, "games": 11, "rpg": 6.8, "ra_total": 46}, {"team": "Virginia", "conference": "ACC", "rank": 22, "fraud_delta": 0.1, "abs_fd": 0.1, "sos": 0.419, "tsr": 5.82, "pythag": 0.809, "strength": 2.2464, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.909, "wins": 10, "losses": 1, "games": 11, "rpg": 6.9, "ra_total": 25}, {"team": "Detroit Mercy", "conference": "Horizon League", "rank": 280, "fraud_delta": 0.093, "abs_fd": 0.093, "sos": 0.642, "tsr": -5.37, "pythag": 0.193, "strength": -1.3434, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.286, "wins": 2, "losses": 5, "games": 7, "rpg": 3.2, "ra_total": 35}, {"team": "UC Santa Barbara", "conference": "Big West", "rank": 169, "fraud_delta": 0.089, "abs_fd": 0.089, "sos": 0.311, "tsr": -0.71, "pythag": 0.197, "strength": -0.0757, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.286, "wins": 4, "losses": 10, "games": 14, "rpg": 3.2, "ra_total": 82}, {"team": "Yale", "conference": "Ivy League", "rank": 229, "fraud_delta": 0.088, "abs_fd": 0.088, "sos": 0.376, "tsr": -2.38, "pythag": 0.055, "strength": -0.6113, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.143, "wins": 1, "losses": 6, "games": 7, "rpg": 1.4, "ra_total": 33}, {"team": "South Alabama", "conference": "Sun Belt", "rank": 79, "fraud_delta": 0.085, "abs_fd": 0.085, "sos": 0.4, "tsr": 2.14, "pythag": 0.53, "strength": 0.993, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.615, "wins": 8, "losses": 5, "games": 13, "rpg": 3.9, "ra_total": 44}, {"team": "California", "conference": "ACC", "rank": 65, "fraud_delta": 0.084, "abs_fd": 0.084, "sos": 0.314, "tsr": 2.6, "pythag": 0.301, "strength": 0.9726, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.385, "wins": 5, "losses": 8, "games": 13, "rpg": 4.1, "ra_total": 65}, {"team": "Illinois", "conference": "Big Ten", "rank": 143, "fraud_delta": 0.082, "abs_fd": 0.082, "sos": 0.341, "tsr": 0.04, "pythag": 0.251, "strength": 0.1933, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.333, "wins": 4, "losses": 8, "games": 12, "rpg": 3.3, "ra_total": 60}, {"team": "George Washington", "conference": "Atlantic 10", "rank": 185, "fraud_delta": 0.081, "abs_fd": 0.081, "sos": 0.541, "tsr": -1.08, "pythag": 0.252, "strength": -0.06, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 2, "losses": 4, "games": 6, "rpg": 4.0, "ra_total": 29}, {"team": "Grand Canyon", "conference": "Mountain West", "rank": 27, "fraud_delta": 0.08, "abs_fd": 0.08, "sos": 0.479, "tsr": 5.74, "pythag": 0.92, "strength": 2.2998, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 1.0, "wins": 13, "losses": 0, "games": 13, "rpg": 5.7, "ra_total": 15}, {"team": "San Diego St.", "conference": "Mountain West", "rank": 32, "fraud_delta": 0.078, "abs_fd": 0.078, "sos": 0.333, "tsr": 4.83, "pythag": 0.614, "strength": 1.8056, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.692, "wins": 9, "losses": 4, "games": 13, "rpg": 4.9, "ra_total": 38}, {"team": "Mount St. Mary's", "conference": "MAAC", "rank": 285, "fraud_delta": 0.076, "abs_fd": 0.076, "sos": 0.681, "tsr": -5.57, "pythag": 0.124, "strength": -1.4313, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.2, "wins": 1, "losses": 4, "games": 5, "rpg": 2.4, "ra_total": 35}, {"team": "Memphis", "conference": "American", "rank": 180, "fraud_delta": 0.075, "abs_fd": 0.075, "sos": 0.364, "tsr": -0.99, "pythag": 0.325, "strength": -0.0651, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.4, "wins": 4, "losses": 6, "games": 10, "rpg": 5.2, "ra_total": 70}, {"team": "NC State", "conference": "ACC", "rank": 72, "fraud_delta": 0.074, "abs_fd": 0.074, "sos": 0.214, "tsr": 2.38, "pythag": 0.343, "strength": 0.8979, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.417, "wins": 5, "losses": 7, "games": 12, "rpg": 4.9, "ra_total": 77}, {"team": "Portland St.", "conference": "Big Sky", "rank": 184, "fraud_delta": 0.073, "abs_fd": 0.073, "sos": 0.328, "tsr": -1.07, "pythag": 0.127, "strength": -0.2096, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.2, "wins": 2, "losses": 8, "games": 10, "rpg": 3.1, "ra_total": 89}, {"team": "Queens (NC)", "conference": "ASUN", "rank": 209, "fraud_delta": 0.073, "abs_fd": 0.073, "sos": 0.603, "tsr": -1.87, "pythag": 0.26, "strength": -0.2686, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 2, "losses": 4, "games": 6, "rpg": 3.7, "ra_total": 39}, {"team": "Louisville", "conference": "ACC", "rank": 68, "fraud_delta": 0.073, "abs_fd": 0.073, "sos": 0.494, "tsr": 2.53, "pythag": 0.677, "strength": 1.2235, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.75, "wins": 9, "losses": 3, "games": 12, "rpg": 5.7, "ra_total": 38}, {"team": "Kansas City", "conference": "The Summit League", "rank": 182, "fraud_delta": 0.071, "abs_fd": 0.071, "sos": 0.486, "tsr": -1.06, "pythag": 0.314, "strength": -0.0403, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.385, "wins": 5, "losses": 8, "games": 13, "rpg": 3.8, "ra_total": 46}, {"team": "Colgate", "conference": "Patriot League", "rank": 228, "fraud_delta": 0.071, "abs_fd": 0.071, "sos": 0.418, "tsr": -2.38, "pythag": 0.179, "strength": -0.5299, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.25, "wins": 3, "losses": 9, "games": 12, "rpg": 4.0, "ra_total": 92}, {"team": "Omaha", "conference": "The Summit League", "rank": 25, "fraud_delta": 0.071, "abs_fd": 0.071, "sos": 0.548, "tsr": 5.75, "pythag": 0.929, "strength": 2.3333, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 1.0, "wins": 11, "losses": 0, "games": 11, "rpg": 10.0, "ra_total": 22}, {"team": "Illinois St.", "conference": "Missouri Valley", "rank": 92, "fraud_delta": 0.07, "abs_fd": 0.07, "sos": 0.338, "tsr": 1.65, "pythag": 0.475, "strength": 0.7858, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.545, "wins": 6, "losses": 5, "games": 11, "rpg": 4.8, "ra_total": 56}, {"team": "Boston College", "conference": "ACC", "rank": 120, "fraud_delta": 0.066, "abs_fd": 0.066, "sos": 0.372, "tsr": 0.55, "pythag": 0.351, "strength": 0.4149, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.417, "wins": 5, "losses": 7, "games": 12, "rpg": 3.0, "ra_total": 42}, {"team": "Tulsa", "conference": "American", "rank": 132, "fraud_delta": 0.066, "abs_fd": 0.066, "sos": 0.305, "tsr": 0.22, "pythag": 0.291, "strength": 0.2454, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.357, "wins": 5, "losses": 9, "games": 14, "rpg": 3.9, "ra_total": 57}, {"team": "Saint Joseph's", "conference": "Atlantic 10", "rank": 216, "fraud_delta": 0.065, "abs_fd": 0.065, "sos": 0.474, "tsr": -2.12, "pythag": 0.335, "strength": -0.3545, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.4, "wins": 4, "losses": 6, "games": 10, "rpg": 3.7, "ra_total": 32}, {"team": "Marshall", "conference": "Sun Belt", "rank": 83, "fraud_delta": 0.065, "abs_fd": 0.065, "sos": 0.246, "tsr": 1.99, "pythag": 0.435, "strength": 0.8335, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.5, "wins": 7, "losses": 7, "games": 14, "rpg": 4.3, "ra_total": 60}, {"team": "Cal St. Fullerton", "conference": "Big West", "rank": 69, "fraud_delta": 0.065, "abs_fd": 0.065, "sos": 0.25, "tsr": 2.47, "pythag": 0.397, "strength": 0.9602, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 3.9, "ra_total": 49}, {"team": "Pittsburgh", "conference": "ACC", "rank": 105, "fraud_delta": 0.064, "abs_fd": 0.064, "sos": 0.402, "tsr": 1.12, "pythag": 0.474, "strength": 0.6606, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 5.2, "ra_total": 55}, {"team": "UMBC", "conference": "America East", "rank": 266, "fraud_delta": 0.062, "abs_fd": 0.062, "sos": 0.601, "tsr": -4.23, "pythag": 0.188, "strength": -1.0138, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.25, "wins": 1, "losses": 3, "games": 4, "rpg": 2.3, "ra_total": 20}, {"team": "Pacific", "conference": "West Coast", "rank": 245, "fraud_delta": 0.061, "abs_fd": 0.061, "sos": 0.36, "tsr": -3.17, "pythag": 0.121, "strength": -0.8231, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.182, "wins": 2, "losses": 9, "games": 11, "rpg": 2.2, "ra_total": 65}, {"team": "Canisius", "conference": "MAAC", "rank": 153, "fraud_delta": 0.061, "abs_fd": 0.061, "sos": 0.604, "tsr": -0.33, "pythag": 0.439, "strength": 0.2841, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 3, "losses": 3, "games": 6, "rpg": 3.5, "ra_total": 16}, {"team": "North Texas", "conference": "American", "rank": 123, "fraud_delta": 0.059, "abs_fd": 0.059, "sos": 0.279, "tsr": 0.49, "pythag": 0.249, "strength": 0.2979, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.308, "wins": 4, "losses": 9, "games": 13, "rpg": 3.2, "ra_total": 64}, {"team": "Hofstra", "conference": "Coastal Athletic", "rank": 252, "fraud_delta": 0.059, "abs_fd": 0.059, "sos": 0.345, "tsr": -3.51, "pythag": 0.084, "strength": -0.9519, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.143, "wins": 1, "losses": 6, "games": 7, "rpg": 2.0, "ra_total": 37}, {"team": "BYU", "conference": "Big 12", "rank": 112, "fraud_delta": 0.058, "abs_fd": 0.058, "sos": 0.235, "tsr": 0.98, "pythag": 0.173, "strength": 0.397, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.231, "wins": 3, "losses": 10, "games": 13, "rpg": 3.4, "ra_total": 73}, {"team": "Nebraska", "conference": "Big Ten", "rank": 14, "fraud_delta": 0.056, "abs_fd": 0.056, "sos": 0.112, "tsr": 6.89, "pythag": 0.611, "strength": 2.3799, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.667, "wins": 8, "losses": 4, "games": 12, "rpg": 5.5, "ra_total": 43}, {"team": "Coastal Carolina", "conference": "Sun Belt", "rank": 59, "fraud_delta": 0.055, "abs_fd": 0.055, "sos": 0.298, "tsr": 2.92, "pythag": 0.445, "strength": 1.1307, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 0.5, "wins": 7, "losses": 7, "games": 14, "rpg": 5.6, "ra_total": 70}, {"team": "Oakland", "conference": "Horizon League", "rank": 234, "fraud_delta": 0.054, "abs_fd": 0.054, "sos": 0.779, "tsr": -2.55, "pythag": 0.613, "strength": -0.2668, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.667, "wins": 6, "losses": 3, "games": 9, "rpg": 5.1, "ra_total": 28}, {"team": "Florida", "conference": "SEC", "rank": 3, "fraud_delta": 0.052, "abs_fd": 0.052, "sos": 0.309, "tsr": 9.39, "pythag": 0.948, "strength": 3.3282, "fraud_tier": "Overperforming", "inflation": true, "hidden": false, "actual_wp": 1.0, "wins": 16, "losses": 0, "games": 16, "rpg": 9.4, "ra_total": 27}, {"team": "Fairfield", "conference": "MAAC", "rank": 202, "fraud_delta": 0.052, "abs_fd": 0.052, "sos": 0.491, "tsr": -1.71, "pythag": 0.323, "strength": -0.2292, "fraud_tier": "Overperforming", "inflation": false, "hidden": false, "actual_wp": 0.375, "wins": 3, "losses": 5, "games": 8, "rpg": 3.8, "ra_total": 45}, {"team": "Grambling", "conference": "SWAC", "rank": 297, "fraud_delta": 0.049, "abs_fd": 0.049, "sos": 0.748, "tsr": -6.82, "pythag": 0.351, "strength": -1.6837, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.4, "wins": 4, "losses": 6, "games": 10, "rpg": 5.6, "ra_total": 63}, {"team": "Virginia Tech", "conference": "ACC", "rank": 29, "fraud_delta": 0.048, "abs_fd": 0.048, "sos": 0.452, "tsr": 5.32, "pythag": 0.77, "strength": 2.0851, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.818, "wins": 9, "losses": 2, "games": 11, "rpg": 6.4, "ra_total": 30}, {"team": "Utah Tech", "conference": "Western Athletic", "rank": 213, "fraud_delta": 0.047, "abs_fd": 0.047, "sos": 0.379, "tsr": -2.03, "pythag": 0.286, "strength": -0.3887, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 4, "losses": 8, "games": 12, "rpg": 3.7, "ra_total": 61}, {"team": "Michigan St.", "conference": "Big Ten", "rank": 63, "fraud_delta": 0.045, "abs_fd": 0.045, "sos": 0.346, "tsr": 2.77, "pythag": 0.5, "strength": 1.1413, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.545, "wins": 6, "losses": 5, "games": 11, "rpg": 6.8, "ra_total": 61}, {"team": "Texas", "conference": "SEC", "rank": 4, "fraud_delta": 0.043, "abs_fd": 0.043, "sos": 0.314, "tsr": 8.75, "pythag": 0.874, "strength": 3.1041, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.917, "wins": 11, "losses": 1, "games": 12, "rpg": 10.1, "ra_total": 35}, {"team": "Jacksonville St.", "conference": "Conference USA", "rank": 80, "fraud_delta": 0.035, "abs_fd": 0.035, "sos": 0.398, "tsr": 2.13, "pythag": 0.632, "strength": 1.0393, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.667, "wins": 8, "losses": 4, "games": 12, "rpg": 7.8, "ra_total": 64}, {"team": "South Dakota St.", "conference": "The Summit League", "rank": 85, "fraud_delta": 0.035, "abs_fd": 0.035, "sos": 0.617, "tsr": 1.82, "pythag": 0.698, "strength": 1.0615, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.733, "wins": 11, "losses": 4, "games": 15, "rpg": 7.5, "ra_total": 57}, {"team": "Sacramento St.", "conference": "Big Sky", "rank": 62, "fraud_delta": 0.031, "abs_fd": 0.031, "sos": 0.493, "tsr": 2.79, "pythag": 0.815, "strength": 1.3689, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.846, "wins": 11, "losses": 2, "games": 13, "rpg": 4.5, "ra_total": 20}, {"team": "East Texas A&M", "conference": "Southland", "rank": 238, "fraud_delta": 0.031, "abs_fd": 0.031, "sos": 0.702, "tsr": -2.82, "pythag": 0.354, "strength": -0.4864, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.385, "wins": 5, "losses": 8, "games": 13, "rpg": 3.7, "ra_total": 57}, {"team": "New Mexico", "conference": "Mountain West", "rank": 141, "fraud_delta": 0.03, "abs_fd": 0.03, "sos": 0.365, "tsr": 0.08, "pythag": 0.303, "strength": 0.2462, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 4, "losses": 8, "games": 12, "rpg": 2.6, "ra_total": 41}, {"team": "Auburn", "conference": "SEC", "rank": 23, "fraud_delta": 0.028, "abs_fd": 0.028, "sos": 0.343, "tsr": 5.76, "pythag": 0.758, "strength": 2.1644, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.786, "wins": 11, "losses": 3, "games": 14, "rpg": 9.0, "ra_total": 53}, {"team": "Maine", "conference": "America East", "rank": 290, "fraud_delta": 0.026, "abs_fd": 0.026, "sos": 0.522, "tsr": -5.87, "pythag": 0.224, "strength": -1.5151, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.25, "wins": 3, "losses": 9, "games": 12, "rpg": 3.5, "ra_total": 69}, {"team": "Monmouth", "conference": "Coastal Athletic", "rank": 272, "fraud_delta": 0.025, "abs_fd": 0.025, "sos": 0.566, "tsr": -4.57, "pythag": 0.197, "strength": -1.1233, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.222, "wins": 2, "losses": 7, "games": 9, "rpg": 3.7, "ra_total": 71}, {"team": "Akron", "conference": "Mid-American", "rank": 177, "fraud_delta": 0.023, "abs_fd": 0.023, "sos": 0.403, "tsr": -0.96, "pythag": 0.334, "strength": -0.0326, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.357, "wins": 5, "losses": 9, "games": 14, "rpg": 4.4, "ra_total": 70}, {"team": "Jacksonville", "conference": "ASUN", "rank": 146, "fraud_delta": 0.02, "abs_fd": 0.02, "sos": 0.566, "tsr": 0.01, "pythag": 0.518, "strength": 0.4112, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 5.2, "ra_total": 50}, {"team": "Sam Houston", "conference": "Conference USA", "rank": 94, "fraud_delta": 0.02, "abs_fd": 0.02, "sos": 0.521, "tsr": 1.53, "pythag": 0.694, "strength": 0.9391, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.714, "wins": 10, "losses": 4, "games": 14, "rpg": 5.5, "ra_total": 39}, {"team": "Dayton", "conference": "Atlantic 10", "rank": 144, "fraud_delta": 0.019, "abs_fd": 0.019, "sos": 0.796, "tsr": 0.03, "pythag": 0.856, "strength": 0.6304, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.875, "wins": 7, "losses": 1, "games": 8, "rpg": 6.6, "ra_total": 20}, {"team": "UC Riverside", "conference": "Big West", "rank": 172, "fraud_delta": 0.018, "abs_fd": 0.018, "sos": 0.318, "tsr": -0.86, "pythag": 0.149, "strength": -0.1397, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.167, "wins": 1, "losses": 5, "games": 6, "rpg": 3.4, "ra_total": 44}, {"team": "Kennesaw St.", "conference": "Conference USA", "rank": 195, "fraud_delta": 0.018, "abs_fd": 0.018, "sos": 0.368, "tsr": -1.51, "pythag": 0.182, "strength": -0.2901, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.2, "wins": 2, "losses": 8, "games": 10, "rpg": 2.8, "ra_total": 50}, {"team": "Houston", "conference": "Big 12", "rank": 47, "fraud_delta": 0.018, "abs_fd": 0.018, "sos": 0.553, "tsr": 3.42, "pythag": 0.8, "strength": 1.5715, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.818, "wins": 9, "losses": 2, "games": 11, "rpg": 7.1, "ra_total": 30}, {"team": "Northwestern St.", "conference": "Southland", "rank": 205, "fraud_delta": 0.017, "abs_fd": 0.017, "sos": 0.417, "tsr": -1.79, "pythag": 0.291, "strength": -0.2985, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.308, "wins": 4, "losses": 9, "games": 13, "rpg": 3.6, "ra_total": 70}, {"team": "Alabama", "conference": "SEC", "rank": 6, "fraud_delta": 0.017, "abs_fd": 0.017, "sos": 0.37, "tsr": 8.34, "pythag": 0.983, "strength": 3.0662, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 1.0, "wins": 11, "losses": 0, "games": 11, "rpg": 9.2, "ra_total": 9}, {"team": "New Mexico St.", "conference": "Conference USA", "rank": 164, "fraud_delta": 0.016, "abs_fd": 0.016, "sos": 0.457, "tsr": -0.61, "pythag": 0.341, "strength": 0.0945, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.357, "wins": 5, "losses": 9, "games": 14, "rpg": 6.9, "ra_total": 119}, {"team": "Utah St.", "conference": "Mountain West", "rank": 91, "fraud_delta": 0.013, "abs_fd": 0.013, "sos": 0.567, "tsr": 1.68, "pythag": 0.57, "strength": 0.9398, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.583, "wins": 7, "losses": 5, "games": 12, "rpg": 4.9, "ra_total": 42}, {"team": "Florida A&M", "conference": "SWAC", "rank": 223, "fraud_delta": 0.013, "abs_fd": 0.013, "sos": 0.683, "tsr": -2.26, "pythag": 0.57, "strength": -0.2145, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.583, "wins": 7, "losses": 5, "games": 12, "rpg": 7.0, "ra_total": 54}, {"team": "North Carolina", "conference": "ACC", "rank": 20, "fraud_delta": 0.013, "abs_fd": 0.013, "sos": 0.685, "tsr": 5.98, "pythag": 0.987, "strength": 2.4668, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 1.0, "wins": 13, "losses": 0, "games": 13, "rpg": 11.9, "ra_total": 10}, {"team": "Louisiana", "conference": "Sun Belt", "rank": 42, "fraud_delta": 0.012, "abs_fd": 0.012, "sos": 0.426, "tsr": 3.66, "pythag": 0.68, "strength": 1.5372, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.692, "wins": 9, "losses": 4, "games": 13, "rpg": 7.4, "ra_total": 49}, {"team": "Elon", "conference": "Coastal Athletic", "rank": 251, "fraud_delta": 0.01, "abs_fd": 0.01, "sos": 0.518, "tsr": -3.5, "pythag": 0.24, "strength": -0.7986, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.25, "wins": 3, "losses": 9, "games": 12, "rpg": 4.6, "ra_total": 77}, {"team": "Louisiana Tech", "conference": "Conference USA", "rank": 52, "fraud_delta": 0.008, "abs_fd": 0.008, "sos": 0.484, "tsr": 3.25, "pythag": 0.761, "strength": 1.4753, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.769, "wins": 10, "losses": 3, "games": 13, "rpg": 6.0, "ra_total": 35}, {"team": "Indiana St.", "conference": "Missouri Valley", "rank": 139, "fraud_delta": 0.007, "abs_fd": 0.007, "sos": 0.457, "tsr": 0.15, "pythag": 0.576, "strength": 0.44, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.583, "wins": 7, "losses": 5, "games": 12, "rpg": 3.9, "ra_total": 33}, {"team": "Oregon St.", "conference": "West Coast", "rank": 90, "fraud_delta": 0.006, "abs_fd": 0.006, "sos": 0.307, "tsr": 1.72, "pythag": 0.456, "strength": 0.7791, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 4.9, "ra_total": 54}, {"team": "Iowa St.", "conference": "Big 12", "rank": 71, "fraud_delta": 0.006, "abs_fd": 0.006, "sos": 0.362, "tsr": 2.38, "pythag": 0.63, "strength": 1.0976, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.636, "wins": 7, "losses": 4, "games": 11, "rpg": 8.8, "ra_total": 59}, {"team": "Tennessee", "conference": "SEC", "rank": 1, "fraud_delta": 0.005, "abs_fd": 0.005, "sos": 0.232, "tsr": 10.42, "pythag": 0.995, "strength": 3.6392, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 1.0, "wins": 12, "losses": 0, "games": 12, "rpg": 7.6, "ra_total": 4}, {"team": "Arizona St.", "conference": "Big 12", "rank": 19, "fraud_delta": 0.005, "abs_fd": 0.005, "sos": 0.459, "tsr": 6.1, "pythag": 0.841, "strength": 2.3592, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.846, "wins": 11, "losses": 2, "games": 13, "rpg": 7.5, "ra_total": 33}, {"team": "Purdue", "conference": "Big Ten", "rank": 77, "fraud_delta": 0.002, "abs_fd": 0.002, "sos": 0.357, "tsr": 2.16, "pythag": 0.634, "strength": 1.0311, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.636, "wins": 7, "losses": 4, "games": 11, "rpg": 6.4, "ra_total": 43}, {"team": "Holy Cross", "conference": "Patriot League", "rank": 286, "fraud_delta": 0.0, "abs_fd": 0.0, "sos": 0.0, "tsr": -5.65, "pythag": 0, "strength": -1.6913, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 3, "games": 3, "rpg": 0.0, "ra_total": 0}, {"team": "Dartmouth", "conference": "Ivy League", "rank": 188, "fraud_delta": 0.0, "abs_fd": 0.0, "sos": 0.0, "tsr": -1.17, "pythag": 0, "strength": -0.3473, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 3, "games": 3, "rpg": 0.0, "ra_total": 0}, {"team": "Merrimack", "conference": "MAAC", "rank": 278, "fraud_delta": 0.0, "abs_fd": 0.0, "sos": 0.0, "tsr": -5.23, "pythag": 0, "strength": -1.5653, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 1, "games": 1, "rpg": 0.0, "ra_total": 0}, {"team": "Morgan St.", "conference": "MEAC", "rank": 282, "fraud_delta": 0.0, "abs_fd": 0.0, "sos": 0.0, "tsr": -5.51, "pythag": 0, "strength": -1.6493, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 2, "games": 2, "rpg": 0.0, "ra_total": 0}, {"team": "Brown", "conference": "Ivy League", "rank": 173, "fraud_delta": 0.0, "abs_fd": 0.0, "sos": 0.0, "tsr": -0.86, "pythag": 0, "strength": -0.2543, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 2, "games": 2, "rpg": 0.0, "ra_total": 0}, {"team": "Georgetown", "conference": "Big East", "rank": 196, "fraud_delta": -0.001, "abs_fd": 0.001, "sos": 0.612, "tsr": -1.51, "pythag": 0.601, "strength": 0.0124, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.6, "wins": 3, "losses": 2, "games": 5, "rpg": 5.0, "ra_total": 8}, {"team": "Alabama St.", "conference": "SWAC", "rank": 255, "fraud_delta": -0.001, "abs_fd": 0.001, "sos": 0.55, "tsr": -3.66, "pythag": 0.287, "strength": -0.8099, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.286, "wins": 4, "losses": 10, "games": 14, "rpg": 4.9, "ra_total": 97}, {"team": "UMES", "conference": "MEAC", "rank": 304, "fraud_delta": -0.001, "abs_fd": 0.001, "sos": 0.945, "tsr": -10.46, "pythag": 0.334, "strength": -2.771, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 2, "losses": 4, "games": 6, "rpg": 5.8, "ra_total": 51}, {"team": "Longwood", "conference": "Big South", "rank": 227, "fraud_delta": -0.001, "abs_fd": 0.001, "sos": 0.378, "tsr": -2.35, "pythag": 0.101, "strength": -0.5785, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.1, "wins": 1, "losses": 9, "games": 10, "rpg": 1.6, "ra_total": 43}, {"team": "South Dakota", "conference": "The Summit League", "rank": 157, "fraud_delta": -0.005, "abs_fd": 0.005, "sos": 0.321, "tsr": -0.4, "pythag": 0.172, "strength": 0.0115, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.167, "wins": 2, "losses": 10, "games": 12, "rpg": 2.2, "ra_total": 52}, {"team": "Houston Christian", "conference": "Southland", "rank": 258, "fraud_delta": -0.006, "abs_fd": 0.006, "sos": 0.418, "tsr": -3.93, "pythag": 0.089, "strength": -1.0399, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.083, "wins": 1, "losses": 11, "games": 12, "rpg": 2.0, "ra_total": 64}, {"team": "Stonehill", "conference": "NEC", "rank": 293, "fraud_delta": -0.007, "abs_fd": 0.007, "sos": 0.269, "tsr": -6.24, "pythag": 0.007, "strength": -1.8437, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 5, "games": 5, "rpg": 0.6, "ra_total": 46}, {"team": "Wisconsin", "conference": "Big Ten", "rank": 40, "fraud_delta": -0.008, "abs_fd": 0.008, "sos": 0.475, "tsr": 3.79, "pythag": 0.841, "strength": 1.6724, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.833, "wins": 10, "losses": 2, "games": 12, "rpg": 7.4, "ra_total": 27}, {"team": "UAB", "conference": "American", "rank": 121, "fraud_delta": -0.009, "abs_fd": 0.009, "sos": 0.448, "tsr": 0.55, "pythag": 0.426, "strength": 0.4813, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.417, "wins": 5, "losses": 7, "games": 12, "rpg": 4.6, "ra_total": 60}, {"team": "Iona", "conference": "MAAC", "rank": 257, "fraud_delta": -0.009, "abs_fd": 0.009, "sos": 0.343, "tsr": -3.85, "pythag": 0.134, "strength": -1.0306, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.125, "wins": 1, "losses": 7, "games": 8, "rpg": 1.8, "ra_total": 25}, {"team": "Tennessee St.", "conference": "Ohio Valley", "rank": 254, "fraud_delta": -0.011, "abs_fd": 0.011, "sos": 0.663, "tsr": -3.64, "pythag": 0.211, "strength": -0.8105, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.2, "wins": 1, "losses": 4, "games": 5, "rpg": 5.7, "ra_total": 35}, {"team": "Fordham", "conference": "Atlantic 10", "rank": 150, "fraud_delta": -0.013, "abs_fd": 0.013, "sos": 0.298, "tsr": -0.23, "pythag": 0.313, "strength": 0.1197, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.3, "wins": 3, "losses": 7, "games": 10, "rpg": 2.8, "ra_total": 43}, {"team": "CSU Bakersfield", "conference": "Big West", "rank": 256, "fraud_delta": -0.014, "abs_fd": 0.014, "sos": 0.322, "tsr": -3.69, "pythag": 0.097, "strength": -1.0118, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.083, "wins": 1, "losses": 11, "games": 12, "rpg": 2.4, "ra_total": 88}, {"team": "Arizona", "conference": "Big 12", "rank": 17, "fraud_delta": -0.015, "abs_fd": 0.015, "sos": 0.341, "tsr": 6.2, "pythag": 0.729, "strength": 2.2803, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.714, "wins": 10, "losses": 4, "games": 14, "rpg": 7.6, "ra_total": 53}, {"team": "Howard", "conference": "MEAC", "rank": 219, "fraud_delta": -0.019, "abs_fd": 0.019, "sos": 0.754, "tsr": -2.15, "pythag": 0.619, "strength": -0.1479, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.6, "wins": 6, "losses": 4, "games": 10, "rpg": 6.2, "ra_total": 43}, {"team": "Georgia Tech", "conference": "ACC", "rank": 46, "fraud_delta": -0.02, "abs_fd": 0.02, "sos": 0.338, "tsr": 3.54, "pythag": 0.645, "strength": 1.4378, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.625, "wins": 10, "losses": 6, "games": 16, "rpg": 6.0, "ra_total": 52}, {"team": "San Jose St.", "conference": "Mountain West", "rank": 179, "fraud_delta": -0.021, "abs_fd": 0.021, "sos": 0.24, "tsr": -0.99, "pythag": 0.188, "strength": -0.1848, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.167, "wins": 2, "losses": 10, "games": 12, "rpg": 3.1, "ra_total": 69}, {"team": "Oklahoma", "conference": "SEC", "rank": 2, "fraud_delta": -0.022, "abs_fd": 0.022, "sos": 0.286, "tsr": 9.62, "pythag": 0.939, "strength": 3.3836, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.917, "wins": 11, "losses": 1, "games": 12, "rpg": 13.9, "ra_total": 28}, {"team": "Hawaii", "conference": "Big West", "rank": 125, "fraud_delta": -0.022, "abs_fd": 0.022, "sos": 0.414, "tsr": 0.38, "pythag": 0.407, "strength": 0.4092, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.385, "wins": 5, "losses": 8, "games": 13, "rpg": 3.9, "ra_total": 43}, {"team": "Austin Peay", "conference": "ASUN", "rank": 155, "fraud_delta": -0.024, "abs_fd": 0.024, "sos": 0.497, "tsr": -0.36, "pythag": 0.486, "strength": 0.2623, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 6.3, "ra_total": 65}, {"team": "Penn St.", "conference": "Big Ten", "rank": 35, "fraud_delta": -0.025, "abs_fd": 0.025, "sos": 0.417, "tsr": 4.03, "pythag": 0.871, "strength": 1.7375, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.846, "wins": 11, "losses": 2, "games": 13, "rpg": 6.8, "ra_total": 24}, {"team": "Norfolk St.", "conference": "MEAC", "rank": 249, "fraud_delta": -0.025, "abs_fd": 0.025, "sos": 0.88, "tsr": -3.42, "pythag": 0.525, "strength": -0.5652, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 3, "losses": 3, "games": 6, "rpg": 4.8, "ra_total": 18}, {"team": "Minnesota", "conference": "Big Ten", "rank": 103, "fraud_delta": -0.025, "abs_fd": 0.025, "sos": 0.337, "tsr": 1.28, "pythag": 0.442, "strength": 0.6571, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.417, "wins": 5, "losses": 7, "games": 12, "rpg": 4.4, "ra_total": 50}, {"team": "Samford", "conference": "Southern", "rank": 162, "fraud_delta": -0.027, "abs_fd": 0.027, "sos": 0.365, "tsr": -0.56, "pythag": 0.384, "strength": 0.0947, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.357, "wins": 5, "losses": 9, "games": 14, "rpg": 4.6, "ra_total": 66}, {"team": "Santa Clara", "conference": "West Coast", "rank": 78, "fraud_delta": -0.028, "abs_fd": 0.028, "sos": 0.353, "tsr": 2.15, "pythag": 0.528, "strength": 0.971, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 6, "losses": 6, "games": 12, "rpg": 4.5, "ra_total": 47}, {"team": "Bradley", "conference": "Missouri Valley", "rank": 194, "fraud_delta": -0.03, "abs_fd": 0.03, "sos": 0.454, "tsr": -1.46, "pythag": 0.363, "strength": -0.1515, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 4, "losses": 8, "games": 12, "rpg": 6.8, "ra_total": 83}, {"team": "Tennessee Tech", "conference": "Ohio Valley", "rank": 271, "fraud_delta": -0.031, "abs_fd": 0.031, "sos": 0.56, "tsr": -4.54, "pythag": 0.213, "strength": -1.1092, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.182, "wins": 2, "losses": 9, "games": 11, "rpg": 3.0, "ra_total": 49}, {"team": "Texas Southern", "conference": "SWAC", "rank": 231, "fraud_delta": -0.033, "abs_fd": 0.033, "sos": 0.763, "tsr": -2.42, "pythag": 0.7, "strength": -0.1867, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.667, "wins": 6, "losses": 3, "games": 9, "rpg": 6.9, "ra_total": 39}, {"team": "Missouri St.", "conference": "Conference USA", "rank": 106, "fraud_delta": -0.033, "abs_fd": 0.033, "sos": 0.543, "tsr": 1.1, "pythag": 0.669, "strength": 0.8038, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.636, "wins": 7, "losses": 4, "games": 11, "rpg": 5.2, "ra_total": 32}, {"team": "Sacred Heart", "conference": "MAAC", "rank": 268, "fraud_delta": -0.037, "abs_fd": 0.037, "sos": 0.719, "tsr": -4.38, "pythag": 0.237, "strength": -1.0112, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.2, "wins": 1, "losses": 4, "games": 5, "rpg": 3.8, "ra_total": 36}, {"team": "Buffalo", "conference": "Mid-American", "rank": 204, "fraud_delta": -0.038, "abs_fd": 0.038, "sos": 0.333, "tsr": -1.76, "pythag": 0.269, "strength": -0.3439, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.231, "wins": 3, "losses": 10, "games": 13, "rpg": 4.4, "ra_total": 76}, {"team": "Stony Brook", "conference": "Coastal Athletic", "rank": 264, "fraud_delta": -0.039, "abs_fd": 0.039, "sos": 0.399, "tsr": -4.17, "pythag": 0.116, "strength": -1.1079, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.077, "wins": 1, "losses": 12, "games": 13, "rpg": 2.4, "ra_total": 73}, {"team": "Texas Tech", "conference": "Big 12", "rank": 5, "fraud_delta": -0.041, "abs_fd": 0.041, "sos": 0.295, "tsr": 8.47, "pythag": 0.97, "strength": 3.0566, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.929, "wins": 13, "losses": 1, "games": 14, "rpg": 8.4, "ra_total": 15}, {"team": "Campbell", "conference": "Coastal Athletic", "rank": 100, "fraud_delta": -0.044, "abs_fd": 0.044, "sos": 0.622, "tsr": 1.33, "pythag": 0.771, "strength": 0.9523, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.727, "wins": 8, "losses": 3, "games": 11, "rpg": 7.3, "ra_total": 34}, {"team": "San Diego", "conference": "West Coast", "rank": 131, "fraud_delta": -0.045, "abs_fd": 0.045, "sos": 0.524, "tsr": 0.24, "pythag": 0.462, "strength": 0.4377, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.417, "wins": 5, "losses": 7, "games": 12, "rpg": 3.9, "ra_total": 38}, {"team": "LSU", "conference": "SEC", "rank": 24, "fraud_delta": -0.045, "abs_fd": 0.045, "sos": 0.223, "tsr": 5.75, "pythag": 0.737, "strength": 2.108, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.692, "wins": 9, "losses": 4, "games": 13, "rpg": 6.0, "ra_total": 41}, {"team": "California Baptist", "conference": "Western Athletic", "rank": 64, "fraud_delta": -0.047, "abs_fd": 0.047, "sos": 0.546, "tsr": 2.77, "pythag": 0.847, "strength": 1.3958, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.8, "wins": 12, "losses": 3, "games": 15, "rpg": 6.7, "ra_total": 29}, {"team": "Manhattan", "conference": "MAAC", "rank": 246, "fraud_delta": -0.047, "abs_fd": 0.047, "sos": 0.596, "tsr": -3.23, "pythag": 0.347, "strength": -0.6368, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.3, "wins": 3, "losses": 7, "games": 10, "rpg": 4.3, "ra_total": 48}, {"team": "Mississippi St.", "conference": "SEC", "rank": 9, "fraud_delta": -0.048, "abs_fd": 0.048, "sos": 0.447, "tsr": 7.96, "pythag": 0.971, "strength": 2.976, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.923, "wins": 12, "losses": 1, "games": 13, "rpg": 7.5, "ra_total": 12}, {"team": "Florida St.", "conference": "ACC", "rank": 11, "fraud_delta": -0.048, "abs_fd": 0.048, "sos": 0.26, "tsr": 7.36, "pythag": 0.834, "strength": 2.6477, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.786, "wins": 11, "losses": 3, "games": 14, "rpg": 6.8, "ra_total": 31}, {"team": "Lehigh", "conference": "Patriot League", "rank": 175, "fraud_delta": -0.05, "abs_fd": 0.05, "sos": 0.597, "tsr": -0.94, "pythag": 0.606, "strength": 0.1805, "fraud_tier": "Stable", "inflation": false, "hidden": false, "actual_wp": 0.556, "wins": 5, "losses": 4, "games": 9, "rpg": 6.3, "ra_total": 45}, {"team": "Abilene Christian", "conference": "Western Athletic", "rank": 261, "fraud_delta": -0.05, "abs_fd": 0.05, "sos": 0.355, "tsr": -4.07, "pythag": 0.127, "strength": -1.093, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.077, "wins": 1, "losses": 12, "games": 13, "rpg": 2.7, "ra_total": 86}, {"team": "USC Upstate", "conference": "Big South", "rank": 128, "fraud_delta": -0.051, "abs_fd": 0.051, "sos": 0.743, "tsr": 0.33, "pythag": 0.751, "strength": 0.6605, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.7, "wins": 7, "losses": 3, "games": 10, "rpg": 8.0, "ra_total": 35}, {"team": "Binghamton", "conference": "America East", "rank": 210, "fraud_delta": -0.052, "abs_fd": 0.052, "sos": 0.307, "tsr": -1.91, "pythag": 0.163, "strength": -0.4564, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.111, "wins": 1, "losses": 8, "games": 9, "rpg": 3.0, "ra_total": 66}, {"team": "Drake", "conference": "Missouri Valley", "rank": 192, "fraud_delta": -0.053, "abs_fd": 0.053, "sos": 0.562, "tsr": -1.35, "pythag": 0.453, "strength": -0.0314, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.4, "wins": 4, "losses": 6, "games": 10, "rpg": 5.5, "ra_total": 61}, {"team": "Seton Hall", "conference": "Big East", "rank": 208, "fraud_delta": -0.053, "abs_fd": 0.053, "sos": 0.424, "tsr": -1.82, "pythag": 0.22, "strength": -0.3377, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.167, "wins": 1, "losses": 5, "games": 6, "rpg": 3.5, "ra_total": 28}, {"team": "Lafayette", "conference": "Patriot League", "rank": 289, "fraud_delta": -0.054, "abs_fd": 0.054, "sos": 0.314, "tsr": -5.82, "pythag": 0.054, "strength": -1.6769, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 7, "games": 7, "rpg": 1.8, "ra_total": 43}, {"team": "St. Bonaventure", "conference": "Atlantic 10", "rank": 299, "fraud_delta": -0.054, "abs_fd": 0.054, "sos": 0.648, "tsr": -7.46, "pythag": 0.054, "strength": -2.0387, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 11, "games": 11, "rpg": 1.4, "ra_total": 62}, {"team": "UMass Lowell", "conference": "America East", "rank": 217, "fraud_delta": -0.055, "abs_fd": 0.055, "sos": 0.438, "tsr": -2.13, "pythag": 0.341, "strength": -0.3677, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.286, "wins": 2, "losses": 5, "games": 7, "rpg": 4.6, "ra_total": 33}, {"team": "Rutgers", "conference": "Big Ten", "rank": 93, "fraud_delta": -0.059, "abs_fd": 0.059, "sos": 0.339, "tsr": 1.56, "pythag": 0.521, "strength": 0.783, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 4.9, "ra_total": 42}, {"team": "Michigan", "conference": "Big Ten", "rank": 30, "fraud_delta": -0.059, "abs_fd": 0.059, "sos": 0.406, "tsr": 5.19, "pythag": 0.905, "strength": 2.0988, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.846, "wins": 11, "losses": 2, "games": 13, "rpg": 7.9, "ra_total": 23}, {"team": "UCF", "conference": "Big 12", "rank": 26, "fraud_delta": -0.062, "abs_fd": 0.062, "sos": 0.322, "tsr": 5.74, "pythag": 0.795, "strength": 2.1662, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.733, "wins": 11, "losses": 4, "games": 15, "rpg": 7.3, "ra_total": 42}, {"team": "Ole Miss", "conference": "SEC", "rank": 36, "fraud_delta": -0.063, "abs_fd": 0.063, "sos": 0.348, "tsr": 3.97, "pythag": 0.73, "strength": 1.6172, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.667, "wins": 8, "losses": 4, "games": 12, "rpg": 7.4, "ra_total": 47}, {"team": "Villanova", "conference": "Big East", "rank": 222, "fraud_delta": -0.063, "abs_fd": 0.063, "sos": 0.183, "tsr": -2.2, "pythag": 0.063, "strength": -0.6186, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 13, "games": 13, "rpg": 2.1, "ra_total": 92}, {"team": "Columbia", "conference": "Ivy League", "rank": 263, "fraud_delta": -0.064, "abs_fd": 0.064, "sos": 0.401, "tsr": -4.14, "pythag": 0.064, "strength": -1.1232, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 6, "games": 6, "rpg": 1.5, "ra_total": 26}, {"team": "Georgia", "conference": "SEC", "rank": 12, "fraud_delta": -0.067, "abs_fd": 0.067, "sos": 0.298, "tsr": 7.15, "pythag": 0.924, "strength": 2.6392, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.857, "wins": 12, "losses": 2, "games": 14, "rpg": 8.8, "ra_total": 27}, {"team": "Southern Miss.", "conference": "Sun Belt", "rank": 130, "fraud_delta": -0.068, "abs_fd": 0.068, "sos": 0.466, "tsr": 0.26, "pythag": 0.606, "strength": 0.4917, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 5.6, "ra_total": 53}, {"team": "Arkansas", "conference": "SEC", "rank": 7, "fraud_delta": -0.068, "abs_fd": 0.068, "sos": 0.29, "tsr": 8.28, "pythag": 0.977, "strength": 3.0018, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.909, "wins": 10, "losses": 1, "games": 11, "rpg": 11.3, "ra_total": 13}, {"team": "Youngstown St.", "conference": "Horizon League", "rank": 221, "fraud_delta": -0.07, "abs_fd": 0.07, "sos": 0.543, "tsr": -2.2, "pythag": 0.514, "strength": -0.2637, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.444, "wins": 4, "losses": 5, "games": 9, "rpg": 7.3, "ra_total": 64}, {"team": "Georgia St.", "conference": "Sun Belt", "rank": 145, "fraud_delta": -0.071, "abs_fd": 0.071, "sos": 0.507, "tsr": 0.02, "pythag": 0.609, "strength": 0.4403, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 6.5, "ra_total": 51}, {"team": "Montana", "conference": "Big Sky", "rank": 225, "fraud_delta": -0.071, "abs_fd": 0.071, "sos": 0.519, "tsr": -2.27, "pythag": 0.404, "strength": -0.3468, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 4, "losses": 8, "games": 12, "rpg": 5.9, "ra_total": 73}, {"team": "Hampton", "conference": "Coastal Athletic", "rank": 291, "fraud_delta": -0.071, "abs_fd": 0.071, "sos": 0.792, "tsr": -6.06, "pythag": 0.5, "strength": -1.3754, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.429, "wins": 3, "losses": 4, "games": 7, "rpg": 8.6, "ra_total": 43}, {"team": "Maryland", "conference": "Big Ten", "rank": 107, "fraud_delta": -0.071, "abs_fd": 0.071, "sos": 0.389, "tsr": 1.09, "pythag": 0.5, "strength": 0.6596, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.429, "wins": 6, "losses": 8, "games": 14, "rpg": 4.1, "ra_total": 41}, {"team": "North Dakota St.", "conference": "The Summit League", "rank": 136, "fraud_delta": -0.071, "abs_fd": 0.071, "sos": 0.547, "tsr": 0.15, "pythag": 0.654, "strength": 0.5146, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.583, "wins": 7, "losses": 5, "games": 12, "rpg": 5.1, "ra_total": 36}, {"team": "UCLA", "conference": "Big Ten", "rank": 10, "fraud_delta": -0.072, "abs_fd": 0.072, "sos": 0.254, "tsr": 7.92, "pythag": 0.841, "strength": 2.818, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.769, "wins": 10, "losses": 3, "games": 13, "rpg": 9.2, "ra_total": 37}, {"team": "UNLV", "conference": "Mountain West", "rank": 189, "fraud_delta": -0.075, "abs_fd": 0.075, "sos": 0.504, "tsr": -1.19, "pythag": 0.408, "strength": -0.0245, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 4, "losses": 8, "games": 12, "rpg": 4.9, "ra_total": 60}, {"team": "Radford", "conference": "Big South", "rank": 152, "fraud_delta": -0.078, "abs_fd": 0.078, "sos": 0.36, "tsr": -0.29, "pythag": 0.364, "strength": 0.1624, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.286, "wins": 2, "losses": 5, "games": 7, "rpg": 2.8, "ra_total": 19}, {"team": "Northwestern", "conference": "Big Ten", "rank": 51, "fraud_delta": -0.078, "abs_fd": 0.078, "sos": 0.249, "tsr": 3.26, "pythag": 0.54, "strength": 1.2678, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.462, "wins": 6, "losses": 7, "games": 13, "rpg": 4.8, "ra_total": 44}, {"team": "UNC Greensboro", "conference": "Southern", "rank": 124, "fraud_delta": -0.082, "abs_fd": 0.082, "sos": 0.49, "tsr": 0.44, "pythag": 0.665, "strength": 0.586, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.583, "wins": 7, "losses": 5, "games": 12, "rpg": 4.8, "ra_total": 33}, {"team": "DePaul", "conference": "Big East", "rank": 166, "fraud_delta": -0.083, "abs_fd": 0.083, "sos": 0.653, "tsr": -0.62, "pythag": 0.621, "strength": 0.2989, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 5.4, "ra_total": 45}, {"team": "Long Beach St.", "conference": "Big West", "rank": 61, "fraud_delta": -0.084, "abs_fd": 0.084, "sos": 0.42, "tsr": 2.83, "pythag": 0.72, "strength": 1.3061, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.636, "wins": 7, "losses": 4, "games": 11, "rpg": 5.7, "ra_total": 34}, {"team": "Idaho St.", "conference": "Big Sky", "rank": 114, "fraud_delta": -0.086, "abs_fd": 0.086, "sos": 0.455, "tsr": 0.93, "pythag": 0.586, "strength": 0.6778, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.5, "wins": 6, "losses": 6, "games": 12, "rpg": 5.2, "ra_total": 43}, {"team": "Ohio St.", "conference": "Big Ten", "rank": 41, "fraud_delta": -0.087, "abs_fd": 0.087, "sos": 0.334, "tsr": 3.71, "pythag": 0.587, "strength": 1.4577, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.5, "wins": 6, "losses": 6, "games": 12, "rpg": 7.7, "ra_total": 57}, {"team": "UC San Diego", "conference": "Big West", "rank": 115, "fraud_delta": -0.091, "abs_fd": 0.091, "sos": 0.612, "tsr": 0.89, "pythag": 0.805, "strength": 0.8344, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.714, "wins": 10, "losses": 4, "games": 14, "rpg": 7.1, "ra_total": 36}, {"team": "Morehead St.", "conference": "Ohio Valley", "rank": 298, "fraud_delta": -0.092, "abs_fd": 0.092, "sos": 0.652, "tsr": -6.84, "pythag": 0.092, "strength": -1.8324, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 6, "games": 6, "rpg": 2.0, "ra_total": 28}, {"team": "Wagner", "conference": "NEC", "rank": 265, "fraud_delta": -0.097, "abs_fd": 0.097, "sos": 0.547, "tsr": -4.21, "pythag": 0.297, "strength": -0.9719, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.2, "wins": 1, "losses": 4, "games": 5, "rpg": 3.0, "ra_total": 24}, {"team": "Siena", "conference": "MAAC", "rank": 226, "fraud_delta": -0.1, "abs_fd": 0.1, "sos": 0.599, "tsr": -2.34, "pythag": 0.5, "strength": -0.2917, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.4, "wins": 2, "losses": 3, "games": 5, "rpg": 5.6, "ra_total": 28}, {"team": "Troy", "conference": "Sun Belt", "rank": 54, "fraud_delta": -0.109, "abs_fd": 0.109, "sos": 0.641, "tsr": 3.07, "pythag": 0.942, "strength": 1.5622, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.833, "wins": 10, "losses": 2, "games": 12, "rpg": 8.7, "ra_total": 19}, {"team": "Furman", "conference": "Southern", "rank": 269, "fraud_delta": -0.11, "abs_fd": 0.11, "sos": 0.493, "tsr": -4.42, "pythag": 0.193, "strength": -1.1051, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.083, "wins": 1, "losses": 11, "games": 12, "rpg": 4.9, "ra_total": 96}, {"team": "Princeton", "conference": "Ivy League", "rank": 111, "fraud_delta": -0.113, "abs_fd": 0.113, "sos": 0.624, "tsr": 1.0, "pythag": 0.738, "strength": 0.8376, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.625, "wins": 5, "losses": 3, "games": 8, "rpg": 7.4, "ra_total": 21}, {"team": "South Carolina St.", "conference": "MEAC", "rank": 302, "fraud_delta": -0.115, "abs_fd": 0.115, "sos": 0.877, "tsr": -9.79, "pythag": 0.282, "strength": -2.5985, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.167, "wins": 1, "losses": 5, "games": 6, "rpg": 7.5, "ra_total": 50}, {"team": "Stetson", "conference": "ASUN", "rank": 101, "fraud_delta": -0.115, "abs_fd": 0.115, "sos": 0.587, "tsr": 1.3, "pythag": 0.884, "strength": 0.9882, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.769, "wins": 10, "losses": 3, "games": 13, "rpg": 7.5, "ra_total": 27}, {"team": "Kansas", "conference": "Big 12", "rank": 55, "fraud_delta": -0.116, "abs_fd": 0.116, "sos": 0.355, "tsr": 3.06, "pythag": 0.741, "strength": 1.353, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.625, "wins": 10, "losses": 6, "games": 16, "rpg": 7.3, "ra_total": 45}, {"team": "Fresno St.", "conference": "Mountain West", "rank": 96, "fraud_delta": -0.119, "abs_fd": 0.119, "sos": 0.333, "tsr": 1.47, "pythag": 0.519, "strength": 0.7501, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.4, "wins": 4, "losses": 6, "games": 10, "rpg": 3.4, "ra_total": 23}, {"team": "UT Arlington", "conference": "Western Athletic", "rank": 142, "fraud_delta": -0.119, "abs_fd": 0.119, "sos": 0.473, "tsr": 0.07, "pythag": 0.483, "strength": 0.3753, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.364, "wins": 4, "losses": 7, "games": 11, "rpg": 8.8, "ra_total": 82}, {"team": "Nevada", "conference": "Mountain West", "rank": 56, "fraud_delta": -0.12, "abs_fd": 0.12, "sos": 0.29, "tsr": 3.05, "pythag": 0.62, "strength": 1.2543, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.5, "wins": 7, "losses": 7, "games": 14, "rpg": 4.6, "ra_total": 39}, {"team": "Lindenwood", "conference": "Ohio Valley", "rank": 149, "fraud_delta": -0.125, "abs_fd": 0.125, "sos": 0.529, "tsr": -0.1, "pythag": 0.67, "strength": 0.4414, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.545, "wins": 6, "losses": 5, "games": 11, "rpg": 7.0, "ra_total": 38}, {"team": "North Florida", "conference": "ASUN", "rank": 53, "fraud_delta": -0.127, "abs_fd": 0.127, "sos": 0.534, "tsr": 3.22, "pythag": 0.877, "strength": 1.5417, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.75, "wins": 12, "losses": 4, "games": 16, "rpg": 5.2, "ra_total": 25}, {"team": "Saint Louis", "conference": "Atlantic 10", "rank": 178, "fraud_delta": -0.133, "abs_fd": 0.133, "sos": 0.661, "tsr": -0.98, "pythag": 0.633, "strength": 0.1977, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 6, "losses": 6, "games": 12, "rpg": 6.6, "ra_total": 49}, {"team": "Indiana", "conference": "Big Ten", "rank": 39, "fraud_delta": -0.136, "abs_fd": 0.136, "sos": 0.441, "tsr": 3.88, "pythag": 0.886, "strength": 1.7087, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.75, "wins": 9, "losses": 3, "games": 12, "rpg": 8.9, "ra_total": 29}, {"team": "Cal Poly", "conference": "Big West", "rank": 239, "fraud_delta": -0.136, "abs_fd": 0.136, "sos": 0.379, "tsr": -2.84, "pythag": 0.136, "strength": -0.7067, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 7, "games": 7, "rpg": 1.6, "ra_total": 22}, {"team": "Toledo", "conference": "Mid-American", "rank": 212, "fraud_delta": -0.14, "abs_fd": 0.14, "sos": 0.388, "tsr": -2.03, "pythag": 0.231, "strength": -0.4117, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.091, "wins": 1, "losses": 10, "games": 11, "rpg": 3.5, "ra_total": 54}, {"team": "Duke", "conference": "ACC", "rank": 18, "fraud_delta": -0.15, "abs_fd": 0.15, "sos": 0.345, "tsr": 6.16, "pythag": 0.75, "strength": 2.2821, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.6, "wins": 9, "losses": 6, "games": 15, "rpg": 6.5, "ra_total": 39}, {"team": "Ohio", "conference": "Mid-American", "rank": 104, "fraud_delta": -0.152, "abs_fd": 0.152, "sos": 0.592, "tsr": 1.25, "pythag": 0.844, "strength": 0.954, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.692, "wins": 9, "losses": 4, "games": 13, "rpg": 9.2, "ra_total": 33}, {"team": "Missouri", "conference": "SEC", "rank": 44, "fraud_delta": -0.157, "abs_fd": 0.157, "sos": 0.194, "tsr": 3.59, "pythag": 0.465, "strength": 1.3211, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.308, "wins": 4, "losses": 9, "games": 13, "rpg": 4.5, "ra_total": 54}, {"team": "Evansville", "conference": "Missouri Valley", "rank": 224, "fraud_delta": -0.159, "abs_fd": 0.159, "sos": 0.617, "tsr": -2.26, "pythag": 0.559, "strength": -0.232, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.4, "wins": 4, "losses": 6, "games": 10, "rpg": 6.4, "ra_total": 51}, {"team": "Green Bay", "conference": "Horizon League", "rank": 292, "fraud_delta": -0.16, "abs_fd": 0.16, "sos": 0.593, "tsr": -6.08, "pythag": 0.16, "strength": -1.5861, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.0, "wins": 0, "losses": 11, "games": 11, "rpg": 3.2, "ra_total": 47}, {"team": "Coppin St.", "conference": "MEAC", "rank": 301, "fraud_delta": -0.163, "abs_fd": 0.163, "sos": 0.856, "tsr": -7.68, "pythag": 0.413, "strength": -1.9008, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.25, "wins": 1, "losses": 3, "games": 4, "rpg": 4.8, "ra_total": 23}, {"team": "Weber St.", "conference": "Big Sky", "rank": 211, "fraud_delta": -0.163, "abs_fd": 0.163, "sos": 0.383, "tsr": -2.0, "pythag": 0.254, "strength": -0.3945, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.091, "wins": 1, "losses": 10, "games": 11, "rpg": 3.5, "ra_total": 63}, {"team": "Washington", "conference": "Big Ten", "rank": 28, "fraud_delta": -0.165, "abs_fd": 0.165, "sos": 0.239, "tsr": 5.45, "pythag": 0.832, "strength": 2.0684, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.667, "wins": 8, "losses": 4, "games": 12, "rpg": 6.7, "ra_total": 28}, {"team": "Boise St.", "conference": "Mountain West", "rank": 75, "fraud_delta": -0.167, "abs_fd": 0.167, "sos": 0.387, "tsr": 2.26, "pythag": 0.705, "strength": 1.1111, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 6.0, "ra_total": 41}, {"team": "Bellarmine", "conference": "ASUN", "rank": 277, "fraud_delta": -0.169, "abs_fd": 0.169, "sos": 0.627, "tsr": -5.14, "pythag": 0.252, "strength": -1.2466, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.083, "wins": 1, "losses": 11, "games": 12, "rpg": 4.3, "ra_total": 78}, {"team": "Butler", "conference": "Big East", "rank": 198, "fraud_delta": -0.178, "abs_fd": 0.178, "sos": 0.578, "tsr": -1.57, "pythag": 0.451, "strength": -0.0922, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.273, "wins": 3, "losses": 8, "games": 11, "rpg": 7.8, "ra_total": 69}, {"team": "Marist", "conference": "MAAC", "rank": 199, "fraud_delta": -0.183, "abs_fd": 0.183, "sos": 0.699, "tsr": -1.58, "pythag": 0.638, "strength": 0.0264, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.455, "wins": 5, "losses": 6, "games": 11, "rpg": 6.7, "ra_total": 44}, {"team": "Jackson St.", "conference": "SWAC", "rank": 243, "fraud_delta": -0.191, "abs_fd": 0.191, "sos": 0.81, "tsr": -3.01, "pythag": 0.691, "strength": -0.3625, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 4, "losses": 4, "games": 8, "rpg": 9.5, "ra_total": 49}, {"team": "Notre Dame", "conference": "ACC", "rank": 58, "fraud_delta": -0.193, "abs_fd": 0.193, "sos": 0.459, "tsr": 2.93, "pythag": 0.731, "strength": 1.3532, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 5.2, "ra_total": 33}, {"team": "Oregon", "conference": "Big Ten", "rank": 21, "fraud_delta": -0.194, "abs_fd": 0.194, "sos": 0.16, "tsr": 5.89, "pythag": 0.732, "strength": 2.1413, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.538, "wins": 7, "losses": 6, "games": 13, "rpg": 5.0, "ra_total": 26}, {"team": "Colorado St.", "conference": "Mountain West", "rank": 138, "fraud_delta": -0.201, "abs_fd": 0.201, "sos": 0.494, "tsr": 0.15, "pythag": 0.534, "strength": 0.438, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.333, "wins": 4, "losses": 8, "games": 12, "rpg": 4.2, "ra_total": 39}, {"team": "Ball St.", "conference": "Mid-American", "rank": 127, "fraud_delta": -0.203, "abs_fd": 0.203, "sos": 0.586, "tsr": 0.33, "pythag": 0.703, "strength": 0.6059, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.5, "wins": 4, "losses": 4, "games": 8, "rpg": 6.0, "ra_total": 30}, {"team": "Bucknell", "conference": "Patriot League", "rank": 267, "fraud_delta": -0.214, "abs_fd": 0.214, "sos": 0.648, "tsr": -4.37, "pythag": 0.339, "strength": -0.9692, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.125, "wins": 1, "losses": 7, "games": 8, "rpg": 5.0, "ra_total": 36}, {"team": "Rider", "conference": "MAAC", "rank": 275, "fraud_delta": -0.217, "abs_fd": 0.217, "sos": 0.824, "tsr": -4.99, "pythag": 0.55, "strength": -1.0261, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 2, "losses": 4, "games": 6, "rpg": 5.8, "ra_total": 26}, {"team": "Robert Morris", "conference": "Horizon League", "rank": 237, "fraud_delta": -0.246, "abs_fd": 0.246, "sos": 0.773, "tsr": -2.76, "pythag": 0.746, "strength": -0.2649, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.5, "wins": 3, "losses": 3, "games": 6, "rpg": 6.8, "ra_total": 15}, {"team": "South Carolina", "conference": "SEC", "rank": 16, "fraud_delta": -0.248, "abs_fd": 0.248, "sos": 0.408, "tsr": 6.29, "pythag": 0.915, "strength": 2.435, "fraud_tier": "Underperforming", "inflation": false, "hidden": true, "actual_wp": 0.667, "wins": 8, "losses": 4, "games": 12, "rpg": 9.3, "ra_total": 23}, {"team": "Valparaiso", "conference": "Missouri Valley", "rank": 203, "fraud_delta": -0.258, "abs_fd": 0.258, "sos": 0.664, "tsr": -1.72, "pythag": 0.713, "strength": 0.0174, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.455, "wins": 5, "losses": 6, "games": 11, "rpg": 6.6, "ra_total": 28}, {"team": "Lipscomb", "conference": "ASUN", "rank": 186, "fraud_delta": -0.273, "abs_fd": 0.273, "sos": 0.567, "tsr": -1.08, "pythag": 0.606, "strength": 0.1298, "fraud_tier": "Underperforming", "inflation": false, "hidden": false, "actual_wp": 0.333, "wins": 4, "losses": 8, "games": 12, "rpg": 6.3, "ra_total": 45}];
+const CONFERENCES = ["ACC", "ASUN", "America East", "American", "Atlantic 10", "Big 12", "Big East", "Big Sky", "Big South", "Big Ten", "Big West", "Coastal Athletic", "Conference USA", "Horizon League", "Ivy League", "MAAC", "MEAC", "Mid-American", "Missouri Valley", "Mountain West", "NEC", "Ohio Valley", "Patriot League", "SEC", "SWAC", "Southern", "Southland", "Sun Belt", "The Summit League", "West Coast", "Western Athletic"];
+
+// ── Color Palettes ──
+var OVER_BG  = '#F2994A';
+var STBL_BG  = '#2E5090';
+var UNDR_BG  = '#5B9AA9';
+var OVER_A  = function(a) { return 'rgba(242,153,74,' + a + ')'; };
+var STBL_A  = function(a) { return 'rgba(46,80,144,' + a + ')'; };
+var UNDR_A  = function(a) { return 'rgba(91,154,169,' + a + ')'; };
+var CAT = ['#5D5C9C','#7E7EB8','#5B9AA9','#D4A574','#E88D67'];
+var SEQ = ['#0D3B66','#1B5A8F','#3682BA','#5AA9D6','#87CEEB'];
+
+Chart.defaults.font.family = "'Montserrat', sans-serif";
+
+// ── State ──
+var activeConf = 'all', activeRank = 'all', activeTab = 'fraud';
+var barChart = null, scatterChart = null;
+
+// ── Tier helpers ──
+function tierBgA(tier, a) {
+  if (tier === 'Overperforming')  return OVER_A(a);
+  if (tier === 'Underperforming') return UNDR_A(a);
+  return STBL_A(a);
+}
+function tierBg(tier) {
+  if (tier === 'Overperforming')  return OVER_BG;
+  if (tier === 'Underperforming') return UNDR_BG;
+  return STBL_BG;
+}
+
+// ── Sequential heat (Stat Leader palette) ──
+function seqColor(n) {
+  var t = Math.max(0, Math.min(1, n));
+  var idx = t * (SEQ.length - 1);
+  var lo = Math.floor(idx), hi = Math.min(SEQ.length - 1, lo + 1);
+  var f = idx - lo;
+  function hex2rgb(h) {
+    var r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
+    return [r,g,b];
+  }
+  var c0 = hex2rgb(SEQ[lo]), c1 = hex2rgb(SEQ[hi]);
+  var r = Math.round(c0[0] + (c1[0]-c0[0])*f);
+  var g = Math.round(c0[1] + (c1[1]-c0[1])*f);
+  var b = Math.round(c0[2] + (c1[2]-c0[2])*f);
+  return 'rgba(' + r + ',' + g + ',' + b + ',0.8)';
+}
+function seqText(n) { return n > 0.55 ? '#e8edf5' : (n > 0.3 ? '#c8daf0' : '#87CEEB'); }
+
+function norm(v, mn, mx) { return (mx === mn) ? 0.5 : (v - mn) / (mx - mn); }
+
+// ── Percentile helpers ──
+function pctile(val, arr) {
+  var count = 0;
+  for (var i = 0; i < arr.length; i++) { if (arr[i] <= val) count++; }
+  return Math.round((count / arr.length) * 100);
+}
+function ordinal(n) {
+  var s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]) + ' %ile';
+}
+
+// ── Filter ──
+function getFiltered() {
+  return RAW_DATA.filter(function(d) {
+    var okC = activeConf === 'all' || d.conference === activeConf;
+    var okR = activeRank === 'all' || (activeRank === 'top25' && d.rank <= 25) || (activeRank === 'top50' && d.rank <= 50);
+    return okC && okR;
+  });
+}
+
+function updateCount(n) {
+  document.getElementById('countBadge').innerHTML = '<strong>' + n + '</strong> teams shown';
+}
+
+// ── Bar Chart ──
+function buildBar(data) {
+  var sorted = data.slice().sort(function(a,b) { return b.abs_fd - a.abs_fd; }).slice(0,20);
+  sorted.sort(function(a,b) { return a.fraud_delta - b.fraud_delta; });
+  if (barChart) { barChart.destroy(); barChart = null; }
+  var ctx = document.getElementById('barCanvas').getContext('2d');
+  barChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(function(d) { return d.team.toUpperCase(); }),
+      datasets: [{
+        label: 'Fraud Delta',
+        data: sorted.map(function(d) { return d.fraud_delta; }),
+        backgroundColor: sorted.map(function(d) { return tierBgA(d.fraud_tier, 0.78); }),
+        borderColor:     sorted.map(function(d) { return tierBg(d.fraud_tier); }),
+        borderWidth: 1, borderRadius: 4, borderSkipped: false
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0c1520', borderColor: '#182637', borderWidth: 1,
+          titleColor: '#e8edf5', bodyColor: '#8fa3be', padding: 12,
+          titleFont: { family: "'Oswald', sans-serif", size: 14, weight: '600' },
+          callbacks: {
+            title: function(items) { return items[0].label; },
+            label: function(ctx) {
+              var d = sorted[ctx.dataIndex];
+              var s = d.fraud_delta >= 0 ? '+' : '';
+              return [
+                '  Fraud Delta: ' + s + d.fraud_delta.toFixed(3),
+                '  SOS: ' + d.sos.toFixed(3),
+                '  Rank: ' + (d.rank <= 304 ? '#' + d.rank : 'NR'),
+                '  Tier: ' + d.fraud_tier
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'rgba(255,255,255,0.06)' },
+          ticks: { color: '#8fa3be', font: { size: 11 } },
+          title: { display: true, text: 'Fraud Delta  (Actual Win% − Pythagorean Win%)', color: '#4a6180', font: { size: 11 } }
+        },
+        y: {
+          grid: { display: false }, border: { display: false },
+          ticks: {
+            color: '#c0d0e0',
+            font: { family: "'Oswald', sans-serif", size: 12, weight: '500' }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Quadrant Plugin for Scatter ──
+var quadrantPlugin = {
+  id: 'quadrant',
+  beforeDatasetsDraw: function(chart) {
+    var ctx = chart.ctx;
+    var xs = chart.scales.x, ys = chart.scales.y;
+    if (!xs || !ys) return;
+    var y0   = ys.getPixelForValue(0);
+    var xMid = xs.getPixelForValue(0.35);
+    var left = xs.left, right = xs.right, top = ys.top, bottom = ys.bottom;
+    ctx.save();
+    // Upper-left: Resume Inflation (subtle orange)
+    ctx.fillStyle = 'rgba(242,153,74,0.06)';
+    ctx.fillRect(left, top, xMid - left, y0 - top);
+    // Upper-right: True Strength (subtle blue)
+    ctx.fillStyle = 'rgba(46,80,144,0.04)';
+    ctx.fillRect(xMid, top, right - xMid, y0 - top);
+    // Lower-left: Shallow Struggle (nearly neutral)
+    ctx.fillStyle = 'rgba(255,255,255,0.01)';
+    ctx.fillRect(left, y0, xMid - left, bottom - y0);
+    // Lower-right: Hidden Strength (subtle teal)
+    ctx.fillStyle = 'rgba(91,154,169,0.06)';
+    ctx.fillRect(xMid, y0, right - xMid, bottom - y0);
+    ctx.restore();
+  },
+  afterDraw: function(chart) {
+    var ctx = chart.ctx;
+    var xs = chart.scales.x, ys = chart.scales.y;
+    if (!xs || !ys) return;
+    var y0   = ys.getPixelForValue(0);
+    var xMid = xs.getPixelForValue(0.35);
+    var left = xs.left, right = xs.right, top = ys.top, bottom = ys.bottom;
+    ctx.save();
+    // Dashed divider lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 6]);
+    // Horizontal at y=0
+    ctx.beginPath(); ctx.moveTo(left, y0); ctx.lineTo(right, y0); ctx.stroke();
+    // Vertical at x=0.35
+    ctx.beginPath(); ctx.moveTo(xMid, top); ctx.lineTo(xMid, bottom); ctx.stroke();
+    ctx.setLineDash([]);
+    // Quadrant labels
+    ctx.font = "600 9px 'Montserrat', sans-serif";
+    ctx.letterSpacing = '0.04em';
+    // Upper-left: Resume Inflation
+    ctx.fillStyle = 'rgba(242,153,74,0.40)';
+    ctx.textAlign = 'left';
+    ctx.fillText('Resume Inflation', left + 10, top + 16);
+    // Upper-right: True Strength
+    ctx.fillStyle = 'rgba(100,130,200,0.38)';
+    ctx.textAlign = 'right';
+    ctx.fillText('True Strength', right - 10, top + 16);
+    // Lower-left: Shallow Struggle
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.textAlign = 'left';
+    ctx.fillText('Shallow Struggle', left + 10, bottom - 9);
+    // Lower-right: Hidden Strength
+    ctx.fillStyle = 'rgba(91,154,169,0.50)';
+    ctx.textAlign = 'right';
+    ctx.fillText('Hidden Strength', right - 10, bottom - 9);
+    ctx.restore();
+  }
+};
+
+// ── Scatter ──
+function buildScatter(data) {
+  var tiers = ['Overperforming','Stable','Underperforming'];
+  var datasets = tiers.map(function(tier) {
+    return {
+      label: tier,
+      data: data.filter(function(d) { return d.fraud_tier === tier && d.sos > 0; })
+                .map(function(d) { return { x: d.sos, y: d.fraud_delta, team: d.team, tsr: d.tsr, rank: d.rank }; }),
+      backgroundColor: tierBgA(tier, 0.72),
+      borderColor: tierBg(tier),
+      borderWidth: 1, pointRadius: 4.5, pointHoverRadius: 7
+    };
+  });
+  if (scatterChart) { scatterChart.destroy(); scatterChart = null; }
+  var ctx = document.getElementById('scatterCanvas').getContext('2d');
+  scatterChart = new Chart(ctx, {
+    type: 'scatter',
+    plugins: [quadrantPlugin],
+    data: { datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0c1520', borderColor: '#182637', borderWidth: 1,
+          titleColor: '#e8edf5', bodyColor: '#8fa3be', padding: 12,
+          titleFont: { family: "'Oswald', sans-serif", size: 14, weight: '600' },
+          callbacks: {
+            title: function(items) { return items[0].raw.team.toUpperCase(); },
+            label: function(item) {
+              var r = item.raw;
+              var s = r.y >= 0 ? '+' : '';
+              return [
+                '  Fraud Delta: ' + s + r.y.toFixed(3),
+                '  SOS: ' + r.x.toFixed(3),
+                '  TSR: ' + r.tsr.toFixed(2),
+                '  Rank: ' + (r.rank <= 304 ? '#' + r.rank : 'NR')
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          min: 0,
+          grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'rgba(255,255,255,0.06)' },
+          ticks: { color: '#8fa3be', font: { size: 11 }, maxTicksLimit: 8 },
+          title: { display: true, text: 'Strength of Schedule (SOS)', color: '#4a6180', font: { size: 11 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'rgba(255,255,255,0.06)' },
+          ticks: { color: '#8fa3be', font: { size: 11 } },
+          title: { display: true, text: 'Fraud Delta', color: '#4a6180', font: { size: 11 } }
+        }
+      }
+    }
+  });
+}
+
+// ── Heatmap ──
+function buildHeatmap(data) {
+  var top = data.slice().sort(function(a,b) { return b.strength - a.strength; }).slice(0,40);
+  var keys = ['sos','tsr','pythag','fraud_delta'];
+  var ranges = {};
+  // Ranges and percentile arrays computed from FULL filtered dataset (not just top 40)
+  var pctArrays = {};
+  keys.forEach(function(k) {
+    var allVals = data.map(function(d) { return d[k]; });
+    var topVals = top.map(function(d) { return d[k]; });
+    ranges[k]    = [Math.min.apply(null,topVals), Math.max.apply(null,topVals)];
+    pctArrays[k] = allVals;
+  });
+
+  // Update meta cards
+  var totOver  = data.filter(function(d) { return d.fraud_tier==='Overperforming'; }).length;
+  var totUnder = data.filter(function(d) { return d.fraud_tier==='Underperforming'; }).length;
+  var totStabl = data.filter(function(d) { return d.fraud_tier==='Stable'; }).length;
+  var avgSos   = data.length ? (data.reduce(function(s,d){ return s+d.sos; },0)/data.length) : 0;
+  var avgFd    = data.length ? (data.reduce(function(s,d){ return s+d.fraud_delta; },0)/data.length) : 0;
+  document.getElementById('hmOver').textContent  = totOver;
+  document.getElementById('hmUnder').textContent = totUnder;
+  document.getElementById('hmStabl').textContent = totStabl;
+  document.getElementById('hmAvgSos').textContent = avgSos.toFixed(3);
+  document.getElementById('hmAvgFd').textContent  = (avgFd >= 0 ? '+' : '') + avgFd.toFixed(3);
+
+  var tbl = document.getElementById('heatTable');
+  tbl.innerHTML = '';
+  var thead = document.createElement('thead');
+  thead.innerHTML = '<tr><th>Team</th><th>Tier</th><th>Rank</th><th>SOS</th><th>TSR</th><th>PYTHAG</th><th>Fraud Δ</th></tr>';
+  tbl.appendChild(thead);
+  var tbody = document.createElement('tbody');
+  top.forEach(function(d) {
+    var tierHtml = d.fraud_tier === 'Overperforming'  ? '<span class="tb to">Regression</span>'  :
+                   d.fraud_tier === 'Underperforming' ? '<span class="tb tu">Riser</span>' :
+                   '<span class="tb ts">Contender</span>';
+    var nSos = norm(d.sos, ranges.sos[0], ranges.sos[1]);
+    var nTsr = norm(d.tsr, ranges.tsr[0], ranges.tsr[1]);
+    var nPy  = norm(d.pythag, ranges.pythag[0], ranges.pythag[1]);
+    var nFd  = norm(d.fraud_delta, ranges.fraud_delta[0], ranges.fraud_delta[1]);
+    var fdS  = d.fraud_delta >= 0 ? '+' : '';
+    var rk   = d.rank <= 304 ? '#' + d.rank : 'NR';
+    // Percentile ranks within full filtered dataset
+    var pSos = pctile(d.sos,         pctArrays.sos);
+    var pTsr = pctile(d.tsr,         pctArrays.tsr);
+    var pPy  = pctile(d.pythag,      pctArrays.pythag);
+    var pFd  = pctile(d.fraud_delta, pctArrays.fraud_delta);
+    function cell(bg, fg, val, pct) {
+      return '<td style="background:' + bg + ';color:' + fg + ';vertical-align:middle;line-height:1.3">' +
+        '<span style="display:block;font-size:11px;font-weight:600">' + val + '</span>' +
+        '<span style="display:block;font-size:9px;opacity:.7;font-family:Montserrat,sans-serif;margin-top:1px">' + ordinal(pct) + '</span>' +
+        '</td>';
+    }
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + d.team.toUpperCase() + '</td>' +
+      '<td>' + tierHtml + '</td>' +
+      '<td>' + rk + '</td>' +
+      cell(seqColor(nSos), seqText(nSos), d.sos.toFixed(3),         pSos) +
+      cell(seqColor(nTsr), seqText(nTsr), d.tsr.toFixed(2),          pTsr) +
+      cell(seqColor(nPy),  seqText(nPy),  d.pythag.toFixed(3),       pPy)  +
+      cell(seqColor(nFd),  seqText(nFd),  fdS + d.fraud_delta.toFixed(3), pFd);
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+}
+
+// ── Coaching Cards ──
+function buildCoaching(data) {
+  var reg  = data.filter(function(d) { return d.fraud_tier==='Overperforming' && d.sos < 0.35 && d.fraud_delta > 0.06; })
+                 .sort(function(a,b) { return b.fraud_delta - a.fraud_delta; }).slice(0,8);
+  var ris  = data.filter(function(d) { return d.fraud_tier==='Underperforming' && d.tsr > 1.5; })
+                 .sort(function(a,b) { return b.tsr - a.tsr; }).slice(0,8);
+  var cont = data.filter(function(d) { return d.fraud_tier==='Stable' && d.sos > 0.45; })
+                 .sort(function(a,b) { return b.sos - a.sos; }).slice(0,8);
+
+  function fill(id, teams, statFn) {
+    var ul = document.getElementById(id);
+    ul.innerHTML = '';
+    if (!teams.length) {
+      ul.innerHTML = '<li style="justify-content:center;color:#4a6180;padding:10px">No teams match filter</li>';
+      return;
+    }
+    teams.forEach(function(d) {
+      var li = document.createElement('li');
+      var rk = d.rank <= 304 ? '#'+d.rank : 'NR';
+      li.innerHTML =
+        '<span class="cc-name">' + d.team + '</span>' +
+        '<span><div class="cc-stat">' + statFn(d) + '</div>' +
+        '<div class="cc-rank">' + rk + ' &middot; ' + (d.conference || '') + '</div></span>';
+      ul.appendChild(li);
+    });
+  }
+
+  fill('regList',  reg,  function(d) { return 'FD +' + d.fraud_delta.toFixed(3) + '  SOS ' + d.sos.toFixed(3); });
+  fill('risList',  ris,  function(d) { return 'TSR ' + d.tsr.toFixed(2) + '  FD ' + d.fraud_delta.toFixed(3); });
+  fill('conList',  cont, function(d) { var s = d.fraud_delta>=0?'+':''; return 'SOS '+d.sos.toFixed(3)+'  FD '+s+d.fraud_delta.toFixed(3); });
+}
+
+// ── Calculator team selector ──
+function populateCalcSelect(data) {
+  var sel  = document.getElementById('calcTeam');
+  var prev = sel.value;
+  sel.innerHTML = '<option value="">-- Select a team --</option>';
+  var sorted = data.slice().sort(function(a,b) { return a.team.localeCompare(b.team); });
+  sorted.forEach(function(d) {
+    var opt = document.createElement('option');
+    opt.value = d.team;
+    var rk = d.rank <= 304 ? ' (#' + d.rank + ')' : '';
+    opt.textContent = d.team + rk;
+    sel.appendChild(opt);
+  });
+  if (prev && sorted.find(function(d) { return d.team === prev; })) {
+    sel.value = prev;
+    runCalc();
+  } else {
+    document.getElementById('calcResults').innerHTML = '<p class="no-data">Select a team to see the projection.</p>';
+  }
+}
+
+// ── Calculator logic ──
+function runCalc() {
+  var teamName  = document.getElementById('calcTeam').value;
+  var seasonLen = parseInt(document.getElementById('calcSeason').value) || 56;
+  var res = document.getElementById('calcResults');
+  if (!teamName) { res.innerHTML = '<p class="no-data">Select a team to see the projection.</p>'; return; }
+  var d = RAW_DATA.find(function(r) { return r.team === teamName; });
+  if (!d) { res.innerHTML = '<p class="no-data">Team not found.</p>'; return; }
+
+  var runsFor = d.rpg * d.games;
+  var runsAg  = d.ra_total;
+  var pythag;
+  if (runsFor > 0 && runsAg > 0) {
+    pythag = (runsFor * runsFor) / ((runsFor * runsFor) + (runsAg * runsAg));
+  } else if (d.pythag > 0) {
+    pythag = d.pythag;
+  } else {
+    res.innerHTML = '<p class="no-data">Insufficient run data for this team.</p>';
+    return;
+  }
+
+  var gamesLeft     = Math.max(0, seasonLen - d.games);
+  var projAddlWins  = pythag * gamesLeft;
+  var projTotalWins = d.wins + projAddlWins;
+  var projTotalLoss = d.losses + (gamesLeft - projAddlWins);
+  var actualWP      = d.games > 0 ? d.wins / d.games : 0;
+  var fd            = d.fraud_delta;
+  var rpgD          = d.rpg > 0 ? d.rpg.toFixed(1) + ' R/G' : 'N/A';
+  var raD           = (d.ra_total > 0 && d.games > 0) ? (d.ra_total / d.games).toFixed(1) + ' RA/G' : 'N/A';
+
+  var vClass, vIcon, vHead, vBody;
+  if (fd > 0.08) {
+    vClass = 'hot'; vIcon = '&#9650;'; vHead = 'Running Hot';
+    vBody = 'Actual win% exceeds run differential expectation by ' + (fd*100).toFixed(1) + ' pts. Regression risk is elevated. Expect the record to drift back toward the Pythagorean projection as sample size grows.';
+  } else if (fd < -0.08) {
+    vClass = 'cold'; vIcon = '&#9660;'; vHead = 'Running Cold';
+    vBody = 'Record underperforms vs run differential by ' + Math.abs(fd*100).toFixed(1) + ' pts. This team is likely better than the W-L shows. Metrics suggest improvement is probable.';
+  } else {
+    vClass = 'stable'; vIcon = '&#9679;'; vHead = 'Neutral';
+    vBody = 'Actual record closely aligns with Pythagorean expectation (FD = ' + (fd>=0?'+':'') + fd.toFixed(3) + '). Record accurately reflects underlying performance.';
+  }
+
+  var fdS = fd >= 0 ? '+' : '';
+  var actPct  = (actualWP * 100).toFixed(1);
+  var pyPct   = (pythag * 100).toFixed(1);
+  var actBar  = Math.round(actualWP * 100);
+  var pyBar   = Math.round(pythag * 100);
+
+  res.innerHTML =
+    '<div class="stat-box"><div class="sb-lbl">Current Record</div>' +
+    '<div class="sb-val">' + d.wins + '–' + d.losses + '</div>' +
+    '<div class="sb-sub">' + d.games + ' games played</div></div>' +
+
+    '<div class="stat-box"><div class="sb-lbl">Pythagorean Win%</div>' +
+    '<div class="sb-val">' + pyPct + '%</div>' +
+    '<div class="sb-sub">Actual: ' + actPct + '% &nbsp;|&nbsp; FD: ' + fdS + fd.toFixed(3) + '</div></div>' +
+
+    '<div class="stat-box hi"><div class="sb-lbl">Projected Final</div>' +
+    '<div class="sb-val">' + Math.round(projTotalWins) + '–' + Math.round(projTotalLoss) + '</div>' +
+    '<div class="sb-sub">Over ' + seasonLen + '-game season</div></div>' +
+
+    '<div class="stat-box"><div class="sb-lbl">Runs For (RPG)</div>' +
+    '<div class="sb-val">' + rpgD + '</div>' +
+    '<div class="sb-sub">Total RF: ' + (d.rpg > 0 ? Math.round(runsFor) : 'N/A') + '</div></div>' +
+
+    '<div class="stat-box"><div class="sb-lbl">Runs Against</div>' +
+    '<div class="sb-val">' + raD + '</div>' +
+    '<div class="sb-sub">Total RA: ' + (d.ra_total > 0 ? d.ra_total : 'N/A') + '</div></div>' +
+
+    '<div class="stat-box"><div class="sb-lbl">Proj. Addl Wins</div>' +
+    '<div class="sb-val">+' + projAddlWins.toFixed(1) + '</div>' +
+    '<div class="sb-sub">' + gamesLeft + ' games remaining</div></div>' +
+
+    '<div class="stat-box" style="grid-column:1/-1;padding:12px 16px">' +
+    '<div class="sb-lbl" style="margin-bottom:10px">Win % Pace Comparison</div>' +
+    '<div class="pace-row"><div class="pace-label"><span>Actual Win%</span><span>' + actPct + '%</span></div>' +
+    '<div class="pace-bar"><div class="pace-fill" style="width:' + actBar + '%;background:' + (fd>0.08?UNDR_BG:(fd<-0.08?OVER_BG:STBL_BG)) + '"></div></div></div>' +
+    '<div class="pace-row" style="margin-top:8px"><div class="pace-label"><span>Pythagorean Win%</span><span>' + pyPct + '%</span></div>' +
+    '<div class="pace-bar"><div class="pace-fill" style="width:' + pyBar + '%;background:#3682BA"></div></div></div>' +
+    '</div>' +
+
+    '<div class="verdict ' + vClass + '">' +
+    '<span class="verdict-icon">' + vIcon + '</span>' +
+    '<div class="verdict-text"><strong>' + vHead + '</strong><p>' + vBody + '</p></div>' +
+    '</div>';
+}
+
+// ── Tab switching ──
+function switchTab(id) {
+  activeTab = id;
+  document.querySelectorAll('.nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.tab === id);
+  });
+  document.querySelectorAll('.tab-panel').forEach(function(el) {
+    el.classList.toggle('active', el.id === 'panel-' + id);
+  });
+  if (id === 'fraud') {
+    setTimeout(function() {
+      if (barChart) barChart.resize();
+      if (scatterChart) scatterChart.resize();
+    }, 50);
+  }
+}
+
+// ── Master refresh ──
+function refresh() {
+  var data = getFiltered();
+  updateCount(data.length);
+  buildBar(data);
+  buildScatter(data);
+  buildHeatmap(data);
+  buildCoaching(data);
+  populateCalcSelect(data);
+}
+
+// ── Wire up filters ──
+document.getElementById('confSelect').addEventListener('change', function() {
+  activeConf = this.value; refresh();
+});
+document.querySelectorAll('.rb').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.rb').forEach(function(b) { b.classList.remove('active'); });
+    this.classList.add('active');
+    activeRank = this.dataset.rank; refresh();
+  });
+});
+
+// ── Wire up tab nav ──
+document.querySelectorAll('.nav-item').forEach(function(el) {
+  el.addEventListener('click', function() { switchTab(this.dataset.tab); });
+});
+
+// ── Calculator ──
+document.getElementById('calcBtn').addEventListener('click', runCalc);
+document.getElementById('calcTeam').addEventListener('change', runCalc);
+
+// ── Init ──
+refresh();
+
+</script>
+</body>
+</html>
